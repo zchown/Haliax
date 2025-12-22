@@ -1,0 +1,55 @@
+# Zig build artifacts
+zig-cache/
+zig-out/
+.zig-cache/
+
+# Build outputs
+*.o
+*.so
+*.dylib
+*.dll
+*.a
+*.lib
+*.exe
+*.wasm
+
+# Test outputs
+test-results/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS files
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+# Temp files
+temp
+**/temp
+*.tmp
+*.temp
+
+# Logs
+*.log
+
+# Coverage
+*.profdata
+*.profraw
