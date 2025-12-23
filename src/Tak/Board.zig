@@ -14,6 +14,7 @@ pub const num_piece_types = 3;
 pub const num_colors = 2;
 pub const zobrist_stack_depth = board_size + 1;
 pub const num_directions = 4;
+pub const crush_map_size = 256;
 
 pub const StoneType = enum(u2) {
     Flat,
@@ -308,6 +309,7 @@ pub const Board = struct {
     standing_stones: Bitboard = 0,
     capstones: Bitboard = 0,
     gameHistory: GameHistory,
+    crushMoves: [crush_map_size]Crush = undefined,
     game_status: Result = Result{
         .road = 0,
         .flat = 0,
@@ -332,6 +334,7 @@ pub const Board = struct {
             .standing_stones = 0,
             .capstones = 0,
             .gameHistory = try GameHistory.init(allocator),
+            .crushMoves = [crush_map_size]Crush{},
             .game_status = Result{
                 .road = 0,
                 .flat = 0,
@@ -340,6 +343,11 @@ pub const Board = struct {
             },
             .allocator = allocator,
         };
+
+        for (0..crush_map_size) |i| {
+            brd.crushMoves[i] = .NoCrush;
+        }
+
         zob.updateZobristHash(&brd);
         return brd;
     }
