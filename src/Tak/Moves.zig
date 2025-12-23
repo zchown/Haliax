@@ -3,6 +3,55 @@ const brd = @import("Board.zig");
 const sym = @import("Sympathy.zig");
 const zob = @import("Zobrist.zig");
 
+pub const MoveList = struct {
+    moves: []brd.Move,
+    count: usize,
+    capacity: usize,
+    allocator: *std.mem.Allocator,
+
+    pub fn init(allocator: *std.mem.Allocator, initial_capacity: usize) !MoveList {
+        const moves = try allocator.alloc(brd.Move, initial_capacity);
+        return MoveList{
+            .moves = moves,
+            .count = 0,
+            .capacity = initial_capacity,
+            .allocator = allocator,
+        };
+    }
+
+    pub fn deinit(self: *MoveList) void {
+        self.allocator.free(self.moves);
+        self.moves = &[_]brd.Move{};
+        self.count = 0;
+        self.capacity = 0;
+    }
+
+    pub fn resize(self: *MoveList, new_capacity: usize) !void {
+        const new_moves = try self.allocator.alloc(brd.Move, new_capacity);
+        std.mem.copy(brd.Move, new_moves[0..self.count], self.moves[0..self.count]);
+        self.allocator.free(self.moves);
+        self.moves = new_moves;
+        self.capacity = new_capacity;
+    }
+
+    pub fn append(self: *MoveList, move: brd.Move) !void {
+        if (self.count >= self.capacity) {
+            try self.resize(self.allocator, self.capacity * 2);
+        }
+        self.moves[self.count] = move;
+        self.count += 1;
+    }
+
+    pub fn clear(self: *MoveList) void {
+        self.count = 0;
+    }
+
+    pub inline fn appendUnsafe(self: *MoveList, move: brd.Move) void {
+        self.moves[self.count] = move;
+        self.count += 1;
+    }
+};
+
 pub const MoveError = error{
     InvalidMove,
     InvalidPosition,
@@ -394,3 +443,153 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) MoveError!void {
     board.half_move_count -= 1;
 }
 
+pub fn generateMoves(board: *const brd.Board, moves: *MoveList) !void {
+
+    if (board.half_move_count < 2) {
+        for (0..brd.board_size * brd.board_size) |pos| {
+            if (brd.getBit(board.empty_squares, pos)) {
+                // will always have at least this much capacity to start
+                moves.appendUnsafe(brd.Move{
+                    .position = pos,
+                    .pattern = 0,
+                    .flag = @as(u8, brd.StoneType.Flat),
+                });
+            }
+        }
+        return;
+    }
+
+    try generatePlaceMoves(board, moves);
+    try generateSlideMoves(board, moves);
+}
+
+fn generatePlaceMoves(board: *const brd.Board, moves: *MoveList) !void {
+    const color: brd.Color = board.to_move;
+    for (0..brd.board_size * brd.board_size) |pos| {
+        if (brd.getBit(board.empty_squares, pos)) {
+            if (color == brd.Color.White) {
+                if (board.white_stones_remaining > 0) {
+                    moves.appendUnsafe(brd.Move{
+                        .position = pos,
+                        .pattern = 0,
+                        .flag = @as(u8, brd.StoneType.Flat),
+                    });
+                    moves.appendUnsafe(brd.Move{
+                        .position = pos,
+                        .pattern = 0,
+                        .flag = @as(u8, brd.StoneType.Standing),
+                    });
+                }
+                if (board.white_capstones > 0) {
+                    moves.appendUnsafe(brd.Move{
+                        .position = pos,
+                        .pattern = 0,
+                        .flag = @as(u8, brd.StoneType.Capstone),
+                    });
+                }
+            } else {
+                if (board.black_stones_remaining > 0) {
+                    moves.appendUnsafe(brd.Move{
+                        .position = pos,
+                        .pattern = 0,
+                        .flag = @as(u8, brd.StoneType.Flat),
+                    });
+                    moves.appendUnsafe(brd.Move{
+                        .position = pos,
+                        .pattern = 0,
+                        .flag = @as(u8, brd.StoneType.Standing),
+                    });
+                }
+                if (board.black_capstones > 0) {
+                    moves.appendUnsafe(brd.Move{
+                        .position = pos,
+                        .pattern = 0,
+                        .flag = @as(u8, brd.StoneType.Capstone),
+                    });
+                }
+            }
+        }
+    }
+}
+
+fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
+    const color: brd.Color = board.to_move;
+    const color_bits = if (color == brd.Color.White) board.white_control else board.black_control;
+
+    for (0..brd.board_size * brd.board_size) |pos| {
+        if (!brd.getBit(color_bits, pos)) {
+            continue;
+        }
+        var can_crush: bool = false;
+        if (board.squares[pos].top()) |top_stone| {
+            if (top_stone.stone_type == brd.StoneType.Capstone) {
+                can_crush = true;
+            }
+        }
+
+        const max_pickup = board.squares[pos].len;
+
+        for (brd.Direction) |dir| {
+            const max_steps = numSteps(board, pos, dir);
+            var doing_crush: bool = false;
+
+            // check if we can crush at the end
+            if (can_crush and max_steps < brd.max_pickup) {
+                if (brd.nthPositionFrom(pos, dir, max_steps)) |end_pos| {
+                    if (board.squares[end_pos].top()) |stone| {
+                        if (stone.stone_type == brd.StoneType.Standing) {
+                            doing_crush = true;
+                        }
+                    }
+                }
+            }
+
+            const patterns = sym.patterns.patterns[max_pickup - 1][max_steps - 1];
+            if (moves.count + patterns.len > moves.capacity) {
+                try moves.resize(moves.capacity * 2);
+            }
+            for (0..patterns.len) |pattern| {
+                moves.appendUnsafe(brd.Move{
+                    .position = pos,
+                    .pattern = pattern,
+                    .flag = @as(u8, dir),
+                });
+            }
+
+            if (doing_crush) {
+                const crush_patterns = sym.patterns.crush_patterns[max_pickup - 1][max_steps - 1];
+                if (moves.count + crush_patterns.len > moves.capacity) {
+                    try moves.resize(moves.capacity * 2);
+                }
+
+                for (0..crush_patterns.len) |pattern| {
+                    moves.appendUnsafe(brd.Move{
+                        .position = pos,
+                        .pattern = pattern,
+                        .flag = @as(u8, dir),
+                    });
+                }
+            }
+        }
+    }
+}
+
+fn numSteps(board: *const brd.Board, start: brd.Position, dir: brd.Direction) usize {
+    var steps: usize = 0;
+    var cur_pos = brd.nextPosition(start, dir) orelse return steps;
+    var pos_bit: brd.Bitboard = brd.positionBit(cur_pos);
+
+    for (0..brd.max_pickup) |_| {
+        if ((board.standing_stones | board.capstones) & pos_bit != 0) {
+            return steps;
+        }
+        steps += 1;
+        cur_pos = brd.nextPosition(cur_pos, dir) orelse return steps;
+        switch (dir) {
+            .North => pos_bit <<= brd.board_size,
+            .South => pos_bit >>= brd.board_size,
+            .East => pos_bit <<= 1,
+            .West => pos_bit >>= 1,
+        }
+    }
+}
