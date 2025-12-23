@@ -1,5 +1,5 @@
 const std = @import("std");
-const Board = @import("board.zig");
+const brd = @import("board.zig");
 
 pub const PTNParseError = error{
     ParseError,
@@ -23,12 +23,12 @@ pub const PTN = struct {
     clock: ?[]const u8 = null,
     result: ?[]const u8 = null,
     size: usize = 0,
-    moves: std.ArrayList(Board.Move),
+    moves: std.ArrayList(brd.Move),
     allocator: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator) !PTN {
         return PTN{
-            .moves = std.ArrayList(Board.Move).init(allocator),
+            .moves = std.ArrayList(brd.Move).init(allocator),
             .allocator = allocator,
         };
     }
@@ -52,7 +52,7 @@ pub fn parsePTN(allocator: std.mem.Allocator, input: []const u8) !PTN {
 
     var lines = std.mem.split(u8, input, "\n");
     var flip: u8 = 0;
-    var current_color = Board.Color.White;
+    var current_color = brd.Color.White;
 
     while (lines.next()) |line| {
         const trimmed = std.mem.trim(u8, line, " \t\r");
@@ -101,7 +101,7 @@ pub fn parsePTN(allocator: std.mem.Allocator, input: []const u8) !PTN {
     return ptn;
 }
 
-pub fn parseMove(move_str: []const u8, color: Board.Color) PTNParseError!Board.Move {
+pub fn parseMove(move_str: []const u8, color: brd.Color) PTNParseError!brd.Move {
     _ = color;
 
     const crush = move_str.len > 0 and move_str[move_str.len - 1] == '*';
@@ -109,19 +109,19 @@ pub fn parseMove(move_str: []const u8, color: Board.Color) PTNParseError!Board.M
 
     if (str.len == 2 and std.ascii.isAlphabetic(str[0]) and std.ascii.isDigit(str[1])) {
         const pos = try parsePosition(str);
-        return Board.createPlaceMove(pos, .Flat);
+        return brd.createPlaceMove(pos, .Flat);
     } else if (str.len == 3 and str[0] == 'S' and std.ascii.isAlphabetic(str[1]) and std.ascii.isDigit(str[2])) {
         const pos = try parsePosition(str[1..]);
-        return Board.createPlaceMove(pos, .Standing);
+        return brd.createPlaceMove(pos, .Standing);
     } else if (str.len == 3 and str[0] == 'C' and std.ascii.isAlphabetic(str[1]) and std.ascii.isDigit(str[2])) {
         const pos = try parsePosition(str[1..]);
-        return Board.createPlaceMove(pos, .Capstone);
+        return brd.createPlaceMove(pos, .Capstone);
     } else {
         return parseSlideMove(str, crush);
     }
 }
 
-fn parseSlideMove(str: []const u8, crush: bool) PTNParseError!Board.Move {
+fn parseSlideMove(str: []const u8, crush: bool) PTNParseError!brd.Move {
     _ = crush;
 
     var ptr: usize = 0;
@@ -155,10 +155,10 @@ fn parseSlideMove(str: []const u8, crush: bool) PTNParseError!Board.Move {
         pattern = count;
     }
 
-    return Board.createSlideMove(pos, dir, pattern);
+    return brd.createSlideMove(pos, dir, pattern);
 }
 
-fn parsePosition(str: []const u8) PTNParseError!Board.Position {
+fn parsePosition(str: []const u8) PTNParseError!brd.Position {
     if (str.len < 2) return PTNParseError.PositionError;
 
     const col = str[0];
@@ -171,14 +171,14 @@ fn parsePosition(str: []const u8) PTNParseError!Board.Position {
     const x = std.ascii.toLower(col) - 'a';
     const y = row - '1';
 
-    if (x >= Board.board_size or y >= Board.board_size) {
+    if (x >= brd.board_size or y >= brd.board_size) {
         return PTNParseError.PositionError;
     }
 
-    return Board.getPos(@intCast(x), @intCast(y));
+    return brd.getPos(@intCast(x), @intCast(y));
 }
 
-fn charToDirection(c: u8) PTNParseError!Board.Direction {
+fn charToDirection(c: u8) PTNParseError!brd.Direction {
     return switch (c) {
         '+' => .North,
         '-' => .South,
@@ -188,7 +188,7 @@ fn charToDirection(c: u8) PTNParseError!Board.Direction {
     };
 }
 
-pub fn directionToChar(dir: Board.Direction) u8 {
+pub fn directionToChar(dir: brd.Direction) u8 {
     return switch (dir) {
         .North => '+',
         .South => '-',
@@ -197,14 +197,14 @@ pub fn directionToChar(dir: Board.Direction) u8 {
     };
 }
 
-pub fn moveToString(allocator: std.mem.Allocator, move: Board.Move, color: Board.Color) ![]u8 {
+pub fn moveToString(allocator: std.mem.Allocator, move: brd.Move, color: brd.Color) ![]u8 {
     _ = color;
 
-    const x = Board.getX(move.position);
-    const y = Board.getY(move.position);
+    const x = brd.getX(move.position);
+    const y = brd.getY(move.position);
 
     if (move.pattern == 0) {
-        const stone_type: Board.StoneType = @enumFromInt(move.flag);
+        const stone_type: brd.StoneType = @enumFromInt(move.flag);
         const prefix = switch (stone_type) {
             .Flat => "",
             .Standing => "S",
@@ -212,7 +212,7 @@ pub fn moveToString(allocator: std.mem.Allocator, move: Board.Move, color: Board
         };
         return std.fmt.allocPrint(allocator, "{s}{c}{d}", .{ prefix, @as(u8, 'a') + @as(u8, @intCast(x)), y + 1 });
     } else {
-        const dir: Board.Direction = @enumFromInt(move.flag);
+        const dir: brd.Direction = @enumFromInt(move.flag);
         const dir_char = directionToChar(dir);
 
         var pickup_count: u8 = 0;
@@ -293,10 +293,10 @@ test "parse PTN with blank lines" {
 }
 
 test "char to direction conversions" {
-    try std.testing.expectEqual(Board.Direction.North, try charToDirection('+'));
-    try std.testing.expectEqual(Board.Direction.South, try charToDirection('-'));
-    try std.testing.expectEqual(Board.Direction.East, try charToDirection('>'));
-    try std.testing.expectEqual(Board.Direction.West, try charToDirection('<'));
+    try std.testing.expectEqual(brd.Direction.North, try charToDirection('+'));
+    try std.testing.expectEqual(brd.Direction.South, try charToDirection('-'));
+    try std.testing.expectEqual(brd.Direction.East, try charToDirection('>'));
+    try std.testing.expectEqual(brd.Direction.West, try charToDirection('<'));
 
     try std.testing.expectError(PTNParseError.DirectionError, charToDirection('x'));
 }
@@ -310,7 +310,7 @@ test "direction to char conversions" {
 
 test "move to string - flat placement" {
     const allocator = std.testing.allocator;
-    const move = Board.createPlaceMove(Board.getPos(2, 3), .Flat);
+    const move = brd.createPlaceMove(brd.getPos(2, 3), .Flat);
     const str = try moveToString(allocator, move, .White);
     defer allocator.free(str);
 
@@ -319,7 +319,7 @@ test "move to string - flat placement" {
 
 test "move to string - standing stone" {
     const allocator = std.testing.allocator;
-    const move = Board.createPlaceMove(Board.getPos(0, 0), .Standing);
+    const move = brd.createPlaceMove(brd.getPos(0, 0), .Standing);
     const str = try moveToString(allocator, move, .White);
     defer allocator.free(str);
 
@@ -328,7 +328,7 @@ test "move to string - standing stone" {
 
 test "move to string - capstone" {
     const allocator = std.testing.allocator;
-    const move = Board.createPlaceMove(Board.getPos(5, 5), .Capstone);
+    const move = brd.createPlaceMove(brd.getPos(5, 5), .Capstone);
     const str = try moveToString(allocator, move, .White);
     defer allocator.free(str);
 

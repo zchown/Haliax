@@ -262,32 +262,6 @@ pub fn movesEqual(a: Move, b: Move) bool {
         a.pattern == b.pattern;
 }
 
-pub const GameHistory = struct {
-    moves: std.ArrayList(Move),
-
-    pub fn init(allocator: std.mem.Allocator) !GameHistory {
-        return GameHistory{
-            .moves = try std.ArrayList(Move).initCapacity(allocator, 256),
-        };
-    }
-
-    pub fn deinit(self: *GameHistory) void {
-        self.moves.deinit();
-    }
-
-    pub fn clear(self: *GameHistory) !void {
-        try self.moves.clearRetainingCapacity();
-    }
-
-    pub fn print(self: *const GameHistory) void {
-        const stdout = std.io.getStdOut().writer();
-        for (0..self.moves.items.len) |i| {
-            _ = stdout.print("{d}: ", .{i + 1});
-            self.moves.items[i].print();
-        }
-    }
-};
-
 const SearchDirection = enum {
     Vertical,
     Horizontal,
@@ -307,7 +281,6 @@ pub const Board = struct {
     empty_squares: Bitboard = 0,
     standing_stones: Bitboard = 0,
     capstones: Bitboard = 0,
-    gameHistory: GameHistory,
     crushMoves: [crush_map_size]Crush = undefined,
     game_status: Result = Result{
         .road = 0,
@@ -315,9 +288,8 @@ pub const Board = struct {
         .color = 0,
         .ongoing = 1,
     },
-    allocator: std.mem.Allocator,
 
-    pub fn init(allocator: std.mem.Allocator) !Board {
+    pub fn init() !Board {
         var brd = try Board{
             .squares = [_]Square{} ** num_squares,
             .white_stones_remaining = stone_count,
@@ -332,7 +304,6 @@ pub const Board = struct {
             .empty_squares = board_mask,
             .standing_stones = 0,
             .capstones = 0,
-            .gameHistory = try GameHistory.init(allocator),
             .crushMoves = [crush_map_size]Crush{},
             .game_status = Result{
                 .road = 0,
@@ -340,7 +311,6 @@ pub const Board = struct {
                 .color = 0,
                 .ongoing = 1,
             },
-            .allocator = allocator,
         };
 
         for (0..crush_map_size) |i| {
@@ -349,10 +319,6 @@ pub const Board = struct {
 
         zob.updateZobristHash(&brd);
         return brd;
-    }
-
-    pub fn deinit(self: *Board) void {
-        self.gameHistory.deinit();
     }
 
     pub fn reset(self: *Board) !void {
@@ -377,6 +343,10 @@ pub const Board = struct {
         };
         try self.gameHistory.clear();
         zob.updateZobristHash(self);
+    }
+
+    pub fn equals(self: *const Board, other: *const Board) bool {
+        return self.zobrist_hash == other.zobrist_hash;
     }
 
     pub fn checkResult(self: *const Board) Result {
