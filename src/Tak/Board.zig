@@ -158,6 +158,36 @@ pub const Square = struct {
         if (self.len == 0) return null;
         return self.stack[self.len - 1];
     }
+
+    pub fn push(self: *Square, piece: Piece) void {
+        self.stack[self.len] = piece;
+        self.len += 1;
+        switch (piece.color) {
+            .White => self.white_count += 1,
+            .Black => self.black_count += 1,
+        }
+    }
+
+    pub fn remove(self: *Square, count: usize) !PieceStack {
+        if (count > self.len) {
+            return error.StackUnderflow;
+        }
+        var ps = PieceStack{
+            .pieces = [_]?Piece{} ** max_pickup,
+            .len = count,
+        };
+        for (0..count) |i| {
+            const piece = self.stack[self.len - count + i];
+            ps.pieces[i] = piece;
+            switch (piece.?) {
+                .White => self.white_count -= 1,
+                .Black => self.black_count -= 1,
+            }
+            self.stack[self.len - count + i] = null;
+        }
+        self.len -= count;
+        return ps;
+    }
 };
 
 pub const Result = packed struct(u4) {
