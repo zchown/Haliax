@@ -197,7 +197,7 @@ pub fn directionToChar(dir: brd.Direction) u8 {
     };
 }
 
-pub fn moveToString(allocator: std.mem.Allocator, move: brd.Move, color: brd.Color) ![]u8 {
+pub fn moveToString(allocator: *std.mem.Allocator, move: brd.Move, color: brd.Color) ![]u8 {
     _ = color;
 
     const x = brd.getX(move.position);
@@ -210,42 +210,42 @@ pub fn moveToString(allocator: std.mem.Allocator, move: brd.Move, color: brd.Col
             .Standing => "S",
             .Capstone => "C",
         };
-        return std.fmt.allocPrint(allocator, "{s}{c}{d}", .{ prefix, @as(u8, 'a') + @as(u8, @intCast(x)), y + 1 });
+        return std.fmt.allocPrint(allocator.*, "{s}{c}{d}", .{ prefix, @as(u8, 'a') + @as(u8, @intCast(x)), y + 1 });
     } else {
         const dir: brd.Direction = @enumFromInt(move.flag);
         const dir_char = directionToChar(dir);
 
         var pickup_count: u8 = 0;
-        var drops = std.ArrayList(u8).init(allocator);
-        defer drops.deinit();
+        var drops = try std.ArrayList(u8).initCapacity(allocator.*, brd.max_pickup);
+        defer drops.deinit(allocator.*);
 
         var temp_pattern = move.pattern;
         while (temp_pattern > 0) {
             const drop = @as(u8, @intCast(temp_pattern & 0b111));
-            try drops.append(drop);
+            try drops.append(allocator.*, drop);
             pickup_count += drop;
             temp_pattern >>= 3;
         }
 
-        var result = std.ArrayList(u8).init(allocator);
-        defer result.deinit();
+        var result = try std.ArrayList(u8).initCapacity(allocator.*, 16);
+        defer result.deinit(allocator.*);
 
         if (pickup_count > 1) {
-            try result.append('0' + pickup_count);
+            try result.append(allocator.*, '0' + pickup_count);
         }
 
-        try result.append(@as(u8, 'a') + @as(u8, @intCast(x)));
-        try result.append('0' + @as(u8, @intCast(y + 1)));
+        try result.append(allocator.*, @as(u8, 'a') + @as(u8, @intCast(x)));
+        try result.append(allocator.*, '0' + @as(u8, @intCast(y + 1)));
 
-        try result.append(dir_char);
+        try result.append(allocator.*, dir_char);
 
         if (drops.items.len > 1) {
             for (drops.items) |drop| {
-                try result.append('0' + drop);
+                try result.append(allocator.*, '0' + drop);
             }
         }
 
-        return result.toOwnedSlice();
+        return result.toOwnedSlice(allocator.*);
     }
 }
 

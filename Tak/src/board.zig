@@ -140,7 +140,7 @@ pub const Direction = enum(u2) {
 pub const Piece = packed struct(u4) {
     stone_type: StoneType,
     color: Color,
-    _padding: u1,
+    _padding: u1 = 0,
 };
 
 pub const PieceStack = struct {
@@ -153,6 +153,15 @@ pub const Square = struct {
     len: usize,
     white_count: usize,
     black_count: usize,
+
+    pub fn init() Square {
+        return Square{
+            .stack = [_]?Piece{null} ** max_stack_height,
+            .len = 0,
+            .white_count = 0,
+            .black_count = 0,
+        };
+    }
 
     pub fn top(self: *const Square) ?Piece {
         if (self.len == 0) return null;
@@ -168,25 +177,19 @@ pub const Square = struct {
         }
     }
 
-    pub fn remove(self: *Square, count: usize) !PieceStack {
+    pub fn remove(self: *Square, count: usize) !void {
         if (count > self.len) {
             return error.StackUnderflow;
         }
-        var ps = PieceStack{
-            .pieces = [_]?Piece{} ** max_pickup,
-            .len = count,
-        };
         for (0..count) |i| {
             const piece = self.stack[self.len - count + i];
-            ps.pieces[i] = piece;
-            switch (piece.?) {
+            switch (piece.?.color) {
                 .White => self.white_count -= 1,
                 .Black => self.black_count -= 1,
             }
             self.stack[self.len - count + i] = null;
         }
         self.len -= count;
-        return ps;
     }
 };
 
@@ -289,9 +292,9 @@ pub const Board = struct {
         .ongoing = 1,
     },
 
-    pub fn init() !Board {
-        var brd = try Board{
-            .squares = [_]Square{} ** num_squares,
+    pub fn init() Board {
+        var brd = Board{
+            .squares = [_]Square{Square.init()} ** 36,
             .white_stones_remaining = stone_count,
             .black_stones_remaining = stone_count,
             .white_capstones_remaining = capstone_count,
@@ -304,7 +307,7 @@ pub const Board = struct {
             .empty_squares = board_mask,
             .standing_stones = 0,
             .capstones = 0,
-            .crushMoves = [crush_map_size]Crush{},
+            .crushMoves = [_]Crush{.NoCrush} ** crush_map_size,
             .game_status = Result{
                 .road = 0,
                 .flat = 0,
@@ -313,11 +316,7 @@ pub const Board = struct {
             },
         };
 
-        for (0..crush_map_size) |i| {
-            brd.crushMoves[i] = .NoCrush;
-        }
-
-        zob.updateZobristHash(&brd);
+        zob.computeZobristHash(&brd);
         return brd;
     }
 
@@ -342,24 +341,24 @@ pub const Board = struct {
             .ongoing = 1,
         };
         try self.gameHistory.clear();
-        zob.updateZobristHash(self);
+        zob.computeZobristHash(self);
     }
 
     pub fn equals(self: *const Board, other: *const Board) bool {
         return self.zobrist_hash == other.zobrist_hash;
     }
 
-    pub fn checkResult(self: *const Board) Result {
+    pub fn checkResult(self: *Board) Result {
         self.updateResult();
         return self.game_status;
     }
 
-    fn updateResult(self: *const Board) void {
+    fn updateResult(self: *Board) void {
         if (self.empty_squares == 0) {
             const white_flats: Bitboard = (self.white_control & ~self.standing_stones) & ~self.capstones;
             const black_flats: Bitboard = (self.black_control & ~self.standing_stones) & ~self.capstones;
-            const white_count = countBits(white_flats);
-            const black_count = countBits(black_flats);
+            const white_count: f64 = @as(f64, @floatFromInt(countBits(white_flats)));
+            const black_count: f64 = @as(f64, @floatFromInt(countBits(black_flats)));
             if (white_count == black_count + komi) {
                 self.game_status = Result{
                     .road = 0,
@@ -443,6 +442,12 @@ pub inline fn isOnBoard(x: isize, y: isize) bool {
     return x >= 0 and x < @as(isize, board_size) and y >= 0 and y < @as(isize, board_size);
 }
 
+pub inline fn isOnBoardPos(pos: Position) bool {
+    const x = @as(isize, @intCast(getX(pos)));
+    const y = @as(isize, @intCast(getY(pos)));
+    return isOnBoard(x, y);
+}
+
 pub inline fn directionOffset(dir: Direction) isize {
     return switch (dir) {
         .North => @as(isize, board_size),
@@ -462,13 +467,13 @@ pub inline fn opositeDirection(dir: Direction) Direction {
 }
 
 pub fn nextPosition(pos: Position, dir: Direction) ?Position {
-    const x = @as(isize, getX(pos));
-    const y = @as(isize, getY(pos));
+    const x = @as(isize, @intCast(getX(pos)));
+    const y = @as(isize, @intCast(getY(pos)));
     const offset = directionOffset(dir);
     const new_x = x + (if (dir == .East or dir == .West) offset else 0);
-    const new_y = y + (if (dir == .North or dir == .South) offset / @as(isize, board_size) else 0);
+    const new_y = y + (if (dir == .North or dir == .South) @divTrunc(offset, @as(isize, board_size)) else 0);
     if (isOnBoard(new_x, new_y)) {
-        return getPos(@as(usize, new_x), @as(usize, new_y));
+        return getPos(@as(usize, @intCast((new_x))), @as(usize, @intCast(new_y)));
     } else {
         return null;
     }
@@ -476,7 +481,7 @@ pub fn nextPosition(pos: Position, dir: Direction) ?Position {
 
 pub fn nthPositionFrom(pos: Position, dir: Direction, n: usize) ?Position {
     var current_pos: Position = pos;
-    for (n) |_| {
+    for (0..n) |_| {
         const next_pos = nextPosition(current_pos, dir);
         if (next_pos == null) {
             return null;

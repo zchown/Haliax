@@ -63,14 +63,14 @@ pub const Patterns = struct {
     }
 };
 
-fn generatePatternsForConfig(list: *Patterns.PatternList, num_zeros: usize, num_ones: usize) void {
+fn generatePatternsForConfig(list: *PatternList, num_zeros: usize, num_ones: usize) void {
     var pattern: [8]u1 = [_]u1{0} ** 8;
     const pickup = num_zeros + num_ones;
     const start_idx = 8 - pickup;
     generateHelper(list, &pattern, start_idx, num_zeros, num_ones);
 }
 
-fn generatecrushPatternsForConfig(list: *Patterns.PatternList, num_zeros: usize, num_ones: usize) void {
+fn generatecrushPatternsForConfig(list: *PatternList, num_zeros: usize, num_ones: usize) void {
     var pattern: [8]u1 = [_]u1{0} ** 8;
     const pickup = num_zeros + num_ones;
     const start_idx = 8 - pickup;
@@ -78,7 +78,7 @@ fn generatecrushPatternsForConfig(list: *Patterns.PatternList, num_zeros: usize,
     generatecrushHelper(list, &pattern, start_idx, num_zeros, num_ones - 1);
 }
 
-fn generateHelper(list: *Patterns.PatternList, pattern: *[8]u1, idx: usize, zeros_left: usize, ones_left: usize) void {
+fn generateHelper(list: *PatternList, pattern: *[8]u1, idx: usize, zeros_left: usize, ones_left: usize) void {
     if (zeros_left == 0 and ones_left == 0) {
         list.add(convertToPattern(pattern.*));
         return;
@@ -98,7 +98,7 @@ fn generateHelper(list: *Patterns.PatternList, pattern: *[8]u1, idx: usize, zero
     }
 }
 
-fn generatecrushHelper(list: *Patterns.PatternList, pattern: *[8]u1, idx: usize, zeros_left: usize, ones_left: usize) void {
+fn generatecrushHelper(list: *PatternList, pattern: *[8]u1, idx: usize, zeros_left: usize, ones_left: usize) void {
     if (zeros_left == 0 and ones_left == 0) {
         list.add(convertToPattern(pattern.*));
         return;

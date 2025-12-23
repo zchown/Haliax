@@ -18,7 +18,7 @@ pub const TPSError = error{
 };
 
 pub fn parseTPS(tps: []const u8) !Board {
-    var b = try Board.init();
+    var b = Board.init();
 
     var tps_str = tps;
     if (std.mem.startsWith(u8, tps, "[TPS ")) {
@@ -36,7 +36,7 @@ pub fn parseTPS(tps: []const u8) !Board {
         move_str = move_str[0 .. move_str.len - 1];
     }
 
-    // Parse turn (1 = White, 2 = Black)
+    // Parse turn
     b.to_move = if (turn_str[0] == '1') Color.White else Color.Black;
 
     // Parse move number
@@ -82,7 +82,7 @@ fn parseRow(b: *Board, row_str: []const u8, row_num: usize) !void {
             }
             col_number += count;
         } else {
-            const pos = b.getPos(col_number, (board_size - 1) - row_num);
+            const pos = brd.getPos(col_number, (board_size - 1) - row_num);
             try parseStack(b, pos, token);
             col_number += 1;
         }
@@ -133,30 +133,30 @@ fn updateBoardState(b: *Board) !void {
     b.standing_stones = 0;
     b.capstones = 0;
 
-    var white_stones: usize = b.stone_count;
-    var black_stones: usize = b.stone_count;
-    var white_caps: usize = b.capstone_count;
-    var black_caps: usize = b.capstone_count;
+    var white_stones: usize = brd.stone_count;
+    var black_stones: usize = brd.stone_count;
+    var white_caps: usize = brd.capstone_count;
+    var black_caps: usize = brd.capstone_count;
 
-    for (0..b.num_squares) |pos| {
+    for (0..brd.num_squares) |pos| {
         const sq = &b.squares[pos];
         const pos_u6: u6 = @intCast(pos);
 
         if (sq.len == 0) {
-            b.setBit(&b.empty_squares, pos_u6);
+            brd.setBit(&b.empty_squares, pos_u6);
         } else {
             const top_piece = sq.top().?;
 
             if (top_piece.color == .White) {
-                b.setBit(&b.white_control, pos_u6);
+                brd.setBit(&b.white_control, pos_u6);
             } else {
-                b.setBit(&b.black_control, pos_u6);
+                brd.setBit(&b.black_control, pos_u6);
             }
 
             if (top_piece.stone_type == .Standing) {
-                b.setBit(&b.standing_stones, pos_u6);
+                brd.setBit(&b.standing_stones, pos_u6);
             } else if (top_piece.stone_type == .Capstone) {
-                b.setBit(&b.capstones, pos_u6);
+                brd.setBit(&b.capstones, pos_u6);
             }
 
             for (0..sq.len) |i| {
@@ -185,10 +185,10 @@ fn updateBoardState(b: *Board) !void {
 }
 
 pub fn boardToTPS(allocator: std.mem.Allocator, b: *const Board) ![]u8 {
-    var buffer = std.ArrayList(u8).init(allocator);
-    errdefer buffer.deinit();
+    var buffer = try std.ArrayList(u8).initCapacity(allocator, 128);
+    errdefer buffer.deinit(allocator);
 
-    const writer = buffer.writer();
+    const writer = buffer.writer(allocator);
 
     try writer.writeAll("[TPS ");
 
@@ -200,7 +200,7 @@ pub fn boardToTPS(allocator: std.mem.Allocator, b: *const Board) ![]u8 {
         var empty_count: usize = 0;
 
         for (0..board_size) |col| {
-            const pos = b.getPos(col, (board_size - 1) - row);
+            const pos = brd.getPos(col, (board_size - 1) - row);
             const sq = &b.squares[pos];
 
             if (sq.len == 0) {
@@ -250,5 +250,5 @@ pub fn boardToTPS(allocator: std.mem.Allocator, b: *const Board) ![]u8 {
     const turn_char: u8 = if (b.to_move == .White) '1' else '2';
     try writer.print(" {c} {d}]", .{ turn_char, b.half_move_count });
 
-    return buffer.toOwnedSlice();
+    return buffer.toOwnedSlice(allocator);
 }
