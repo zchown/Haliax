@@ -33,7 +33,6 @@ pub const Color = enum(u1) {
     }
 };
 
-// big enough for 8x8
 pub const Position = u6;
 pub const Bitboard = u64;
 
@@ -182,6 +181,7 @@ pub const MoveType = enum(u1) {
 pub const Move = packed struct(u16) {
     position: Position,
     flag: u2, // either direction or stone type
+    // 0 for drop, 1 for move and drop
     pattern: u8, // only for Slide, 0b00000000 for Place
 
     pub inline fn createPlaceMove(pos: Position, stone_type: StoneType) Move {
@@ -218,6 +218,11 @@ pub const Move = packed struct(u16) {
             };
             _ = stdout.print("Slide from ({d}, {d}) to {s} with pattern {b}\n", .{ getX(self.position), getY(self.position), direction, self.pattern });
         }
+    }
+
+    // position of most significant bit in pattern
+    pub fn movedStones(self: Move) usize {
+        return 8 - @clz(self.pattern);
     }
 };
 
@@ -409,6 +414,10 @@ pub const Board = struct {
             return;
         }
     }
+
+    pub fn isSquareEmpty(self: *const Board, pos: Position) bool {
+        return self.squares[pos].len == 0;
+    }
 };
 
 pub inline fn getPos(x: usize, y: usize) Position {
@@ -456,6 +465,18 @@ pub fn nextPosition(pos: Position, dir: Direction) ?Position {
     } else {
         return null;
     }
+}
+
+pub fn nthPositionFrom(pos: Position, dir: Direction, n: usize) ?Position {
+    var current_pos: Position = pos;
+    for (n) |_| {
+        const next_pos = nextPosition(current_pos, dir);
+        if (next_pos == null) {
+            return null;
+        }
+        current_pos = next_pos.?;
+    }
+    return current_pos;
 }
 
 fn hasRoad(player_controlled: Bitboard, search_dir: SearchDirection) bool {
