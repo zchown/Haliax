@@ -1,7 +1,7 @@
 const std = @import("std");
-const brd = @import("Board.zig");
-const sym = @import("Sympathy.zig");
-const zob = @import("Zobrist.zig");
+const brd = @import("board.zig");
+const sym = @import("sympathy.zig");
+const zob = @import("zobrist.zig");
 
 pub const MoveList = struct {
     moves: []brd.Move,
@@ -440,6 +440,7 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) MoveError!void {
     }
 
     board.to_move = board.to_move.opposite();
+    board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
     board.half_move_count -= 1;
 }
 

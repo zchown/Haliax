@@ -1,5 +1,5 @@
 const std = @import("std");
-const zob = @import("Zobrist.zig");
+const zob = @import("zobrist.zig");
 
 pub const board_size = 6;
 pub const num_squares = board_size * board_size;
@@ -8,7 +8,6 @@ pub const capstone_count = 1;
 pub const total_pieces = stone_count + capstone_count;
 pub const max_pickup = board_size;
 pub const max_stack_height = 2 * stone_count + 1;
-pub const directions = .{ .up, .down, .left, .right };
 pub const komi = 2.0;
 pub const num_piece_types = 3;
 pub const num_colors = 2;

@@ -1,5 +1,5 @@
 const std = @import("std");
-const Board = @import("Board.zig");
+const Board = @import("board.zig");
 
 pub const PTNParseError = error{
     ParseError,

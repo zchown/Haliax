@@ -1,5 +1,5 @@
 const std = @import("std");
-const brd = @import("Board.zig");
+const brd = @import("board.zig");
 
 pub const patterns: Patterns = blk: {
     @setEvalBranchQuota(1000000);
