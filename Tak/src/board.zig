@@ -1,5 +1,5 @@
 const std = @import("std");
-const zob = @import("zobrist.zig");
+const zob = @import("zobrist");
 
 pub const board_size = 6;
 pub const num_squares = board_size * board_size;

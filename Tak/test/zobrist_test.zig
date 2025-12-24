@@ -1,7 +1,7 @@
 const std = @import("std");
-const brd = @import("../src/board.zig");
-const zob = @import("../src/zobrist.zig");
-const moves = @import("../src/moves.zig");
+const brd = @import("board");
+const zob = @import("zobrist");
+const moves = @import("moves");
 const testing = std.testing;
 
 test "computeZobristHash - empty board" {

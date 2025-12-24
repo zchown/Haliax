@@ -1,6 +1,6 @@
 const std = @import("std");
-const brd = @import("../src/board.zig");
-const tps = @import("../src/tps.zig");
+const brd = @import("board");
+const tps = @import("tps");
 const testing = std.testing;
 
 test "Board initialization" {

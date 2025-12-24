@@ -1,5 +1,5 @@
 const std = @import("std");
-const brd = @import("board.zig");
+const brd = @import("board");
 
 const Board = brd.Board;
 const Square = brd.Square;

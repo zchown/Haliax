@@ -1,6 +1,6 @@
 const std = @import("std");
-const brd = @import("../src/board.zig");
-const moves = @import("../src/moves.zig");
+const brd = @import("board");
+const moves = @import("moves");
 const testing = std.testing;
 
 test "MoveList initialization" {

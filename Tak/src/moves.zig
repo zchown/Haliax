@@ -1,7 +1,7 @@
 const std = @import("std");
-const brd = @import("board.zig");
-const sym = @import("sympathy.zig");
-const zob = @import("zobrist.zig");
+const brd = @import("board");
+const sym = @import("sympathy");
+const zob = @import("zobrist");
 
 pub const MoveList = struct {
     moves: []brd.Move,

@@ -1,6 +1,6 @@
 const std = @import("std");
-const ptn = @import("../src/ptn.zig");
-const brd = @import("../src/board.zig");
+const ptn = @import("ptn");
+const brd = @import("board");
 const testing = std.testing;
 
 test "PTN init and deinit" {

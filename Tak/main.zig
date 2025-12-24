@@ -1,8 +1,8 @@
 const std = @import("std");
-const brd = @import("src/board.zig");
-const mvs = @import("src/moves.zig");
+const brd = @import("board");
+const mvs = @import("moves");
+const tps = @import("tps");
 const perft = @import("perft.zig");
-const tps = @import("src/tps.zig");
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};

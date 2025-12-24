@@ -1,5 +1,5 @@
 const std = @import("std");
-const brd = @import("board.zig");
+const brd = @import("board");
 
 pub const patterns: Patterns = blk: {
     @setEvalBranchQuota(1000000);
@@ -126,32 +126,3 @@ fn convertToPattern(p: [8]u1) u8 {
     return result;
 }
 
-test "pattern generation" {
-    std.debug.print("\n=== Regular Patterns ===\n", .{});
-    for (1..brd.max_pickup + 1) |pickup| {
-        for (1..brd.max_pickup + 1) |max_length| {
-            const pats = patterns.get(pickup, max_length);
-            std.debug.print("Pickup: {}, Max Length: {}, Pattern Count: {}\n", .{ pickup, max_length, pats.len });
-            std.debug.print("Patterns: ", .{});
-            for (pats) |p| {
-                std.debug.print("{b:0>8} ", .{p});
-            }
-            std.debug.print("\n\n", .{});
-        }
-    }
-
-    std.debug.print("\n=== crush Patterns (must end in 1, use all ones) ===\n", .{});
-    for (1..brd.max_pickup + 1) |pickup| {
-        for (1..brd.max_pickup + 1) |max_length| {
-            const pats = patterns.getcrush(pickup, max_length);
-            if (pats.len > 0) {
-                std.debug.print("Pickup: {}, Length: {}, Pattern Count: {}\n", .{ pickup, max_length, pats.len });
-                std.debug.print("Patterns: ", .{});
-                for (pats) |p| {
-                    std.debug.print("{b:0>8} ", .{p});
-                }
-                std.debug.print("\n\n", .{});
-            }
-        }
-    }
-}

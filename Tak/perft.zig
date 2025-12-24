@@ -1,8 +1,8 @@
 const std = @import("std");
-const brd = @import("src/board.zig");
-const mvs = @import("src/moves.zig");
-const tps = @import("src/tps.zig");
-const ptn = @import("src/ptn.zig");
+const brd = @import("board");
+const mvs = @import("moves");
+const tps = @import("tps");
+const ptn = @import("ptn");
 
 pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []const u8) !void {
     var board = try tps.parseTPS(tps_string);

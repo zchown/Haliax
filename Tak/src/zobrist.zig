@@ -1,5 +1,5 @@
 const std = @import("std");
-const brd = @import("board.zig");
+const brd = @import("board");
 
 pub const ZobristHash = u64;
 

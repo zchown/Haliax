@@ -1,6 +1,6 @@
 const std = @import("std");
-const sym = @import("../src/sympathy.zig");
-const brd = @import("../src/board.zig");
+const sym = @import("sympathy");
+const brd = @import("board");
 const testing = std.testing;
 
 test "PatternList initialization" {
