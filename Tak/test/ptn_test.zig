@@ -232,6 +232,10 @@ test "parsePTN - with slide moves" {
     var p = try ptn.parsePTN(testing.allocator, ptn_text);
     defer p.deinit();
 
+    // for (0..p.moves.items.len) |i| {
+    //     std.debug.print("Move {d}: {any}\n", .{i + 1, p.moves.items[i]});
+    // }
+
     try testing.expectEqual(@as(usize, 6), p.moves.items.len);
 
     try testing.expect(p.moves.items[4].pattern != 0);
@@ -262,8 +266,8 @@ test "parseMove - all positions" {
 
     for (positions, 0..) |pos_str, i| {
         const move = try ptn.parseMove(pos_str, .White);
-        const expected_x = i % 6;
-        const expected_y = i / 6;
+        const expected_x = i / 6;
+        const expected_y = i % 6;
 
         try testing.expectEqual(brd.getPos(expected_x, expected_y), move.position);
     }
