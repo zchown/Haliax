@@ -41,6 +41,7 @@ pub fn parseTPS(tps: []const u8) !Board {
 
     // Parse move number
     b.half_move_count = try std.fmt.parseInt(usize, move_str, 10);
+    b.half_move_count -= 1; // Convert to zero-based
 
     // Parse board string (rows separated by '/')
     var row_iter = std.mem.splitScalar(u8, board_str, '/');
@@ -239,6 +240,6 @@ pub fn boardToTPS(allocator: std.mem.Allocator, b: *const Board) ![]u8 {
         }
     }
     const turn_char: u8 = if (b.to_move == .White) '1' else '2';
-    try writer.print(" {c} {d}]", .{ turn_char, b.half_move_count });
+    try writer.print(" {c} {d}]", .{ turn_char, b.half_move_count + 1});
     return buffer.toOwnedSlice(allocator);
 }

@@ -2,18 +2,16 @@ const std = @import("std");
 const brd = @import("board");
 
 pub const patterns: Patterns = blk: {
-    @setEvalBranchQuota(1000000);
+    @setEvalBranchQuota(1_000_000);
     break :blk Patterns.init();
 };
+
 pub const PatternList = struct {
     len: usize,
     items: [128]u8,
 
     pub fn init() PatternList {
-        return PatternList{
-            .len = 0,
-            .items = [_]u8{0} ** 128,
-        };
+        return .{ .len = 0, .items = [_]u8{0} ** 128 };
     }
 
     pub fn add(self: *PatternList, p: u8) void {
@@ -26,103 +24,66 @@ pub const Patterns = struct {
     patterns: [brd.max_pickup][brd.max_pickup]PatternList,
     crush_patterns: [brd.max_pickup][brd.max_pickup]PatternList,
 
-
     pub fn init() Patterns {
-        var ps = [_][brd.max_pickup]PatternList{[_]PatternList{PatternList.init()} ** (brd.max_pickup)} ** (brd.max_pickup);
-        var eps = [_][brd.max_pickup]PatternList{[_]PatternList{PatternList.init()} ** (brd.max_pickup)} ** (brd.max_pickup);
+        var ps = [_][brd.max_pickup]PatternList{[_]PatternList{PatternList.init()} ** brd.max_pickup} ** brd.max_pickup;
+        var cps = [_][brd.max_pickup]PatternList{[_]PatternList{PatternList.init()} ** brd.max_pickup} ** brd.max_pickup;
 
         for (1..brd.max_pickup + 1) |pickup| {
             for (1..brd.max_pickup + 1) |max_length| {
-                for (1..max_length + 1) |actual_length| {
-                    if (actual_length > pickup) continue;
-                    const num_zeros = pickup - actual_length;
-                    const num_ones = actual_length;
-                    generatePatternsForConfig(&ps[pickup - 1][max_length - 1], num_zeros, num_ones);
-                }
+                generatePatternsForConfig(&ps[pickup - 1][max_length - 1], pickup, max_length);
 
-                if (max_length <= pickup) {
-                    const num_zeros = pickup - max_length;
-                    const num_ones = max_length;
-                    generatecrushPatternsForConfig(&eps[pickup - 1][max_length - 1], num_zeros, num_ones);
-                }
+                generateCrushPatternsForConfig(&cps[pickup - 1][max_length - 1], pickup, max_length);
             }
         }
 
-        return Patterns{
-            .patterns = ps,
-            .crush_patterns = eps,
-        };
+        return .{ .patterns = ps, .crush_patterns = cps };
     }
 
     pub fn get(self: *const Patterns, pickup: usize, max_length: usize) []const u8 {
-        return self.patterns[pickup - 1][max_length - 1].items[0..self.patterns[pickup - 1][max_length - 1].len];
+        const list = &self.patterns[pickup - 1][max_length - 1];
+        return list.items[0..list.len];
     }
 
     pub fn getcrush(self: *const Patterns, pickup: usize, max_length: usize) []const u8 {
-        return self.crush_patterns[pickup - 1][max_length - 1].items[0..self.crush_patterns[pickup - 1][max_length - 1].len];
+        const list = &self.crush_patterns[pickup - 1][max_length - 1];
+        return list.items[0..list.len];
     }
 };
 
-fn generatePatternsForConfig(list: *PatternList, num_zeros: usize, num_ones: usize) void {
-    var pattern: [8]u1 = [_]u1{0} ** 8;
-    const pickup = num_zeros + num_ones;
-    const start_idx = 8 - pickup;
-    generateHelper(list, &pattern, start_idx, num_zeros, num_ones);
-}
-
-fn generatecrushPatternsForConfig(list: *PatternList, num_zeros: usize, num_ones: usize) void {
-    var pattern: [8]u1 = [_]u1{0} ** 8;
-    const pickup = num_zeros + num_ones;
-    const start_idx = 8 - pickup;
-    pattern[7] = 1;
-    generatecrushHelper(list, &pattern, start_idx, num_zeros, num_ones - 1);
-}
-
-fn generateHelper(list: *PatternList, pattern: *[8]u1, idx: usize, zeros_left: usize, ones_left: usize) void {
-    if (zeros_left == 0 and ones_left == 0) {
-        list.add(convertToPattern(pattern.*));
-        return;
-    }
-    if (idx >= 8) return;
-
-    if (zeros_left > 0) {
-        pattern.*[idx] = 0;
-        generateHelper(list, pattern, idx + 1, zeros_left - 1, ones_left);
-        pattern.*[idx] = 0;
-    }
-
-    if (ones_left > 0) {
-        pattern.*[idx] = 1;
-        generateHelper(list, pattern, idx + 1, zeros_left, ones_left - 1);
-        pattern.*[idx] = 0;
+fn generatePatternsForConfig(list: *PatternList, pickup: usize, max_length: usize) void {
+    for (1..pickup + 1) |k| {
+        const decisions: usize = k - 1;
+        const max_moves: usize = if (max_length > 0) max_length - 1 else 0;
+        const limit: usize = @as(usize, 1) << @intCast(decisions);
+        for (0..limit) |m| {
+            const mask: u8 = @intCast(m);
+            if (@popCount(mask) > max_moves) continue;
+            const value: u8 = (@as(u8, 1) << @intCast(decisions)) | mask;
+            list.add(value);
+        }
     }
 }
 
-fn generatecrushHelper(list: *PatternList, pattern: *[8]u1, idx: usize, zeros_left: usize, ones_left: usize) void {
-    if (zeros_left == 0 and ones_left == 0) {
-        list.add(convertToPattern(pattern.*));
-        return;
-    }
-    if (idx >= 7) return;
+fn generateCrushPatternsForConfig(list: *PatternList, pickup: usize, max_length: usize) void {
+    if (max_length == 0) return;
+    const required_moves: usize = max_length - 1;
 
-    if (zeros_left > 0) {
-        pattern.*[idx] = 0;
-        generatecrushHelper(list, pattern, idx + 1, zeros_left - 1, ones_left);
-        pattern.*[idx] = 0;
-    }
+    for (1..pickup + 1) |k| {
+        if (k < max_length) continue;
+        const decisions: usize = k - 1;
+        const limit: usize = @as(usize, 1) << @intCast(decisions);
 
-    if (ones_left > 0) {
-        pattern.*[idx] = 1;
-        generatecrushHelper(list, pattern, idx + 1, zeros_left, ones_left - 1);
-        pattern.*[idx] = 0;
+        for (0..limit) |m| {
+            const mask: u8 = @intCast(m);
+            if (@popCount(mask) != required_moves) continue; // must use full length
+
+            const value: u8 = (@as(u8, 1) << @intCast(decisions)) | mask;
+
+            if ((value & 0b1) == 0) continue;
+
+            list.add(value);
+        }
     }
 }
 
-fn convertToPattern(p: [8]u1) u8 {
-    var result: u8 = 0;
-    for (0..8) |i| {
-        result = (result << 1) | @as(u8, p[i]);
-    }
-    return result;
-}
 

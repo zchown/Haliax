@@ -7,7 +7,7 @@ test "parseTPS - empty board" {
     const board = try tps.parseTPS("[TPS x6/x6/x6/x6/x6/x6 1 10]");
 
     try testing.expectEqual(brd.Color.White, board.to_move);
-    try testing.expectEqual(@as(usize, 10), board.half_move_count);
+    try testing.expectEqual(@as(usize, 9), board.half_move_count);
     try testing.expectEqual(brd.board_mask, board.empty_squares);
 
     for (0..brd.num_squares) |i| {
@@ -74,24 +74,24 @@ test "parseTPS - turn indicator" {
 
 test "parseTPS - move number" {
     const board1 = try tps.parseTPS("[TPS x6/x6/x6/x6/x6/x6 1 1]");
-    try testing.expectEqual(@as(usize, 1), board1.half_move_count);
+    try testing.expectEqual(@as(usize, 0), board1.half_move_count);
 
     const board2 = try tps.parseTPS("[TPS x6/x6/x6/x6/x6/x6 1 42]");
-    try testing.expectEqual(@as(usize, 42), board2.half_move_count);
+    try testing.expectEqual(@as(usize, 41), board2.half_move_count);
 }
 
 test "parseTPS - without TPS prefix" {
     const board = try tps.parseTPS("x6/x6/x6/x6/x6/x6 1 10");
 
     try testing.expectEqual(brd.Color.White, board.to_move);
-    try testing.expectEqual(@as(usize, 10), board.half_move_count);
+    try testing.expectEqual(@as(usize, 9), board.half_move_count);
 }
 
 test "parseTPS - full board" {
     const board = try tps.parseTPS("[TPS 1,1,1,1,1,2/1,1,1,1,2,1/1,x2,2,1,1/x2,2,1,1,1/x,2,1,1,1,1/2,x5 2 20]");
 
     try testing.expectEqual(brd.Color.Black, board.to_move);
-    try testing.expectEqual(@as(usize, 20), board.half_move_count);
+    try testing.expectEqual(@as(usize, 19), board.half_move_count);
 
     const pos1 = brd.getPos(0, 5);
     try testing.expectEqual(brd.Color.White, board.squares[pos1].top().?.color);
@@ -119,7 +119,7 @@ test "boardToTPS - empty board" {
     const tps_str = try tps.boardToTPS(testing.allocator, &board);
     defer testing.allocator.free(tps_str);
 
-    try testing.expectEqualStrings("[TPS x6/x6/x6/x6/x6/x6 1 0]", tps_str);
+    try testing.expectEqualStrings("[TPS x6/x6/x6/x6/x6/x6 1 1]", tps_str);
 }
 
 test "boardToTPS - with single piece" {
@@ -132,7 +132,7 @@ test "boardToTPS - with single piece" {
     const tps_str = try tps.boardToTPS(testing.allocator, &board);
     defer testing.allocator.free(tps_str);
 
-    try testing.expectEqualStrings("[TPS x6/x6/x6/x6/x6/1,x5 1 0]", tps_str);
+    try testing.expectEqualStrings("[TPS x6/x6/x6/x6/x6/1,x5 1 1]", tps_str);
 }
 
 test "boardToTPS - with standing stone" {
@@ -145,7 +145,7 @@ test "boardToTPS - with standing stone" {
     const tps_str = try tps.boardToTPS(testing.allocator, &board);
     defer testing.allocator.free(tps_str);
 
-    try testing.expectEqualStrings("[TPS x5,1S/x6/x6/x6/x6/x6 1 0]", tps_str);
+    try testing.expectEqualStrings("[TPS x5,1S/x6/x6/x6/x6/x6 1 1]", tps_str);
 }
 
 test "boardToTPS - with capstone" {
@@ -158,7 +158,7 @@ test "boardToTPS - with capstone" {
     const tps_str = try tps.boardToTPS(testing.allocator, &board);
     defer testing.allocator.free(tps_str);
 
-    try testing.expectEqualStrings("[TPS x6/x6/x2,2C,x3/x6/x6/x6 1 0]", tps_str);
+    try testing.expectEqualStrings("[TPS x6/x6/x2,2C,x3/x6/x6/x6 1 1]", tps_str);
 }
 
 test "boardToTPS - with stack" {
@@ -175,7 +175,7 @@ test "boardToTPS - with stack" {
     const tps_str = try tps.boardToTPS(testing.allocator, &board);
     defer testing.allocator.free(tps_str);
 
-    try testing.expectEqualStrings("[TPS x6/x6/x6/x6/x6/12,x5 1 0]", tps_str);
+    try testing.expectEqualStrings("[TPS x6/x6/x6/x6/x6/12,x5 1 1]", tps_str);
 }
 
 test "boardToTPS - black to move" {
@@ -185,7 +185,7 @@ test "boardToTPS - black to move" {
     const tps_str = try tps.boardToTPS(testing.allocator, &board);
     defer testing.allocator.free(tps_str);
 
-    try testing.expectEqualStrings("[TPS x6/x6/x6/x6/x6/x6 2 0]", tps_str);
+    try testing.expectEqualStrings("[TPS x6/x6/x6/x6/x6/x6 2 1]", tps_str);
 }
 
 test "boardToTPS - with move count" {
@@ -195,7 +195,7 @@ test "boardToTPS - with move count" {
     const tps_str = try tps.boardToTPS(testing.allocator, &board);
     defer testing.allocator.free(tps_str);
 
-    try testing.expectEqualStrings("[TPS x6/x6/x6/x6/x6/x6 1 15]", tps_str);
+    try testing.expectEqualStrings("[TPS x6/x6/x6/x6/x6/x6 1 16]", tps_str);
 }
 
 test "round trip - empty board" {

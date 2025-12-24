@@ -188,7 +188,7 @@ test "undoMove - place move" {
     const move = brd.Move.createPlaceMove(brd.getPos(0, 0), .Flat);
     moves.makeMove(&board, move);
 
-    try moves.undoMove(&board, move);
+    moves.undoMove(&board, move);
 
     try testing.expectEqual(@as(usize, 0), board.squares[brd.getPos(0, 0)].len);
     try testing.expectEqual(brd.Color.White, board.to_move);
@@ -210,7 +210,7 @@ test "undoMove - slide move" {
     const move = brd.Move.createSlideMove(brd.getPos(0, 0), .North, 0b00000001);
     moves.makeMove(&board, move);
 
-    try moves.undoMove(&board, move);
+    moves.undoMove(&board, move);
 
     try testing.expectEqual(@as(usize, 1), board.squares[brd.getPos(0, 0)].len);
     try testing.expectEqual(@as(usize, 0), board.squares[brd.getPos(0, 1)].len);

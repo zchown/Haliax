@@ -195,6 +195,7 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
                 if (place_color == brd.Color.White) {
                     board.white_stones_remaining -= 1;
                 } else {
+    // (nodes / 1e6) / seconds
                     board.black_stones_remaining -= 1;
                 }
             },
@@ -341,10 +342,10 @@ pub fn checkUndoMove(board: brd.Board, move: brd.Move) MoveError!void {
 pub fn undoMoveWithCheck(board: *brd.Board, move: brd.Move) MoveError!void {
     std.debug.assert(board.half_move_count > 0);
     try checkUndoMove(board.*, move);
-    try undoMove(board, move);
+    undoMove(board, move);
 }
 
-pub fn undoMove(board: *brd.Board, move: brd.Move) MoveError!void {
+pub fn undoMove(board: *brd.Board, move: brd.Move) void {
     zob.updateZobristHash(board, move);
     board.to_move = board.to_move.opposite();
 
@@ -430,8 +431,6 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) MoveError!void {
         if (idx == length) break;
     }
 
-    if (idx != length) return MoveError.InvalidPattern;
-
     var popped: [8]brd.Piece = undefined;
     var pidx: usize = 0;
 
@@ -439,14 +438,8 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) MoveError!void {
     while (j >= 0) : (j -= 1) {
         const pos = positions[@intCast(j)];
 
-        if (board.squares[pos].len == 0) {
-            return MoveError.InvalidCount;
-        }
-
         const top_piece: brd.Piece = board.squares[pos].stack[board.squares[pos].len - 1] orelse unreachable;
-        board.squares[pos].remove(1) catch {
-            return MoveError.InvalidMove;
-        };
+        board.squares[pos].remove(1) catch unreachable;
         popped[pidx] = top_piece;
         pidx += 1;
     }
