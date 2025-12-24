@@ -242,18 +242,16 @@ test "zobrist hash full game consistency" {
     };
 
     for (moves_to_make) |move| {
+        // std.debug.print("Making move at position: {}\n", .{move.position});
+        // std.debug.print("flag: {d}, pattern: {b}\n", .{move.flag, move.pattern});
         const before_hash = board.zobrist_hash;
         moves.makeMove(&board, move);
         const after_hash = board.zobrist_hash;
 
         try testing.expect(before_hash != after_hash);
 
-        var verify_board = brd.Board.init();
-        for (0..brd.num_squares) |i| {
-            verify_board.squares[i] = board.squares[i];
-        }
-        zob.computeZobristHash(&verify_board);
-        try testing.expectEqual(board.zobrist_hash, verify_board.zobrist_hash);
+        zob.computeZobristHash(&board);
+        try testing.expectEqual(after_hash, board.zobrist_hash);
     }
 }
 
@@ -270,7 +268,7 @@ test "zobrist hash after slide move" {
 
     const before_hash = board.zobrist_hash;
 
-    const move = brd.Move.createSlideMove(brd.getPos(0, 0), .North, 0b10000000);
+    const move = brd.Move.createSlideMove(brd.getPos(0, 0), .North, 0b00000001);
     moves.makeMove(&board, move);
 
     try testing.expect(board.zobrist_hash != before_hash);

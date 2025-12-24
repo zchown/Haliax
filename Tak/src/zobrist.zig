@@ -36,7 +36,8 @@ pub fn computeZobristHash(board: *brd.Board) void {
 
     for (0..brd.num_squares) |sq| {
         const square = board.squares[sq];
-        for (0..square.len) |i| {
+        const start: usize = if (@as(isize, @intCast(square.len)) - 7 > 0) square.len - 7 else 0;
+        for (start..square.len) |i| {
             const piece = square.stack[i].?;
             const piece_type: usize = switch (piece.stone_type) {
                 .Flat => 0,
@@ -56,36 +57,23 @@ pub fn computeZobristHash(board: *brd.Board) void {
 
 pub fn updateZobristHash(board: *brd.Board, move: brd.Move) void {
     if (move.pattern == 0) {
+        var color: brd.Color = board.to_move;
+        if (board.half_move_count > 2) {
+            color = color.opposite();
+        }
         const p = brd.Piece{
             .stone_type = @enumFromInt(move.flag),
-            .color = board.to_move,
+            .color = color,
         };
         std.debug.assert(board.squares[move.position].len > 0);
+        // std.debug.print("Piece type: {d}, color: {d}\n", .{@intFromEnum(p.stone_type), @intFromEnum(p.color)});
         updateSinglePositionHash(board, move.position, p, board.squares[move.position].len - 1);
     }
 
     else {
-        var pos: brd.Position = @intCast(move.position);
-        const direction: brd.Direction = @enumFromInt(move.flag);
-        var updates: usize = 0;
-        for (0..brd.max_pickup) |i| {
-            // the ith bit from the left
-            const cur = move.pattern >> (@as(u3, @intCast(brd.max_pickup)) - 1 - @as(u3, @intCast(i))) & 1;
-            if (cur == 0) {
-                updates += 1;
-            }
-            else {
-                for (0..updates) |j| {
-                    const piece_index_from_top = updates - 1 - j;
-                    if (piece_index_from_top >= board.squares[pos].len) continue;
-                    const from_depth = board.squares[pos].len - 1 - piece_index_from_top;
-                    const piece = board.squares[pos].stack[from_depth] orelse unreachable;
-                    updateSinglePositionHash(board, pos, piece, from_depth);
-                }
-                pos = brd.nextPosition(pos, direction) orelse unreachable;
-                updates = 0;
-            }
-        }
+        // cheating for now, just recompute the whole hash
+        // may actually be faster anyway just because of the complexity of slide moves
+        computeZobristHash(board);
     }
 }
 
