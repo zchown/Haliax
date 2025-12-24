@@ -36,7 +36,7 @@ pub const MoveList = struct {
 
     pub fn append(self: *MoveList, move: brd.Move) !void {
         if (self.count >= self.capacity) {
-            try self.resize(self.allocator, self.capacity * 2);
+            try self.resize(self.capacity * 2);
         }
         self.moves[self.count] = move;
         self.count += 1;
@@ -153,10 +153,15 @@ pub fn makeMoveWithCheck(board: *brd.Board, move: brd.Move) MoveError!void {
 }
 
 pub fn makeMove(board: *brd.Board, move: brd.Move) void {
+    var did_crush: bool = false;
+
     defer {
         board.to_move = board.to_move.opposite();
-        board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
         board.half_move_count += 1;
+        if (!did_crush) {
+            // std.debug.print("No crush move made\n", .{});
+            board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
+        }
         zob.updateZobristHash(board, move);
     }
     if (move.pattern == 0) {
@@ -216,17 +221,19 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
         if (stone.stone_type == brd.StoneType.Standing) {
             board.squares[end_pos].stack[board.squares[end_pos].len - 1].?.stone_type = brd.StoneType.Flat;
             board.crushMoves[board.half_move_count % brd.crush_map_size] = .Crush;
+            // std.debug.print("Doing crush move\n", .{});
+            did_crush = true;
         }
     }
 
     // keep track of if we have moved yet
     var started: bool = false;
     var cur_pos: brd.Position = move.position;
-    const diff: usize = 8 - brd.max_pickup;
+    // const diff: usize = 8 - brd.max_pickup;
     // iterate over pattern bits
+    var stones_moved: usize = 0;
     for (0..8) |i| {
         const bit = (move.pattern >> (7 - @as(u3, @intCast(i)))) & 0x1;
-
         if (!started) {
             if (bit == 1) {
                 started = true;
@@ -234,14 +241,16 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
                 continue;
             }
         }
-
         if (bit == 1) {
             cur_pos = brd.nextPosition(cur_pos, dir) orelse unreachable;
         }
-
-        const to_move: brd.Piece = board.squares[move.position].stack[board.squares[move.position].len - 1 - (i - diff)].?;
+        // Use stones_moved counter instead of i - diff
+        const stack_index = board.squares[move.position].len - 1 - stones_moved;
+        const to_move: brd.Piece = board.squares[move.position].stack[stack_index].?;
         board.squares[cur_pos].push(to_move);
+        stones_moved += 1;
     }
+
 
     // remove moved stones from original position
     board.squares[move.position].remove(move.movedStones()) catch {

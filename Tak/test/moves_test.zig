@@ -147,7 +147,7 @@ test "makeMove - simple slide" {
     });
     brd.setBit(&board.white_control, brd.getPos(0, 0));
 
-    const move = brd.Move.createSlideMove(brd.getPos(0, 0), .North, 0b10000000);
+    const move = brd.Move.createSlideMove(brd.getPos(0, 0), .North, 0b00000001);
     moves.makeMove(&board, move);
 
     try testing.expectEqual(@as(usize, 0), board.squares[brd.getPos(0, 0)].len);
@@ -171,11 +171,15 @@ test "makeMove - slide with crush" {
     brd.setBit(&board.black_control, brd.getPos(0, 1));
     brd.setBit(&board.standing_stones, brd.getPos(0, 1));
 
-    const move = brd.Move.createSlideMove(brd.getPos(0, 0), .North, 0b10000000);
+    const move = brd.Move.createSlideMove(brd.getPos(0, 0), .North, 0b00000001);
     moves.makeMove(&board, move);
 
+    // for (0..board.crushMoves.len) |i| {
+    //     std.debug.print("Crush move {}: {}\n", .{i, board.crushMoves[i]});
+    // }
+
     try testing.expectEqual(brd.StoneType.Flat, board.squares[brd.getPos(0, 1)].stack[0].?.stone_type);
-    try testing.expectEqual(brd.Crush.Crush, board.crushMoves[1 % brd.crush_map_size]);
+    try testing.expectEqual(brd.Crush.Crush, board.crushMoves[2 % brd.crush_map_size]);
 }
 
 test "undoMove - place move" {
@@ -203,7 +207,7 @@ test "undoMove - slide move" {
     });
     brd.setBit(&board.white_control, brd.getPos(0, 0));
 
-    const move = brd.Move.createSlideMove(brd.getPos(0, 0), .North, 0b10000000);
+    const move = brd.Move.createSlideMove(brd.getPos(0, 0), .North, 0b00000001);
     moves.makeMove(&board, move);
 
     try moves.undoMove(&board, move);
@@ -318,7 +322,7 @@ test "slide move with multiple drops" {
     }
     brd.setBit(&board.white_control, brd.getPos(0, 0));
 
-    const move = brd.Move.createSlideMove(brd.getPos(0, 0), .North, 0b11000000);
+    const move = brd.Move.createSlideMove(brd.getPos(0, 0), .North, 0b00000011);
     moves.makeMove(&board, move);
 
     try testing.expectEqual(@as(usize, 1), board.squares[brd.getPos(0, 0)].len);

@@ -76,7 +76,9 @@ pub fn updateZobristHash(board: *brd.Board, move: brd.Move) void {
             }
             else {
                 for (0..updates) |j| {
-                    const from_depth = board.squares[pos].len - 1 - (updates - 1 - j);
+                    const piece_index_from_top = updates - 1 - j;
+                    if (piece_index_from_top >= board.squares[pos].len) continue;
+                    const from_depth = board.squares[pos].len - 1 - piece_index_from_top;
                     const piece = board.squares[pos].stack[from_depth] orelse unreachable;
                     updateSinglePositionHash(board, pos, piece, from_depth);
                 }
