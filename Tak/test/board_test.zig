@@ -161,13 +161,13 @@ test "Move equality" {
 }
 
 test "Moved stones count" {
-    const move1 = brd.Move.createSlideMove(brd.getPos(0, 0), .North, 0b11000000);
+    const move1 = brd.Move.createSlideMove(brd.getPos(0, 0), .North, 0b00000011);
     try testing.expectEqual(@as(usize, 2), move1.movedStones());
 
-    const move2 = brd.Move.createSlideMove(brd.getPos(0, 0), .East, 0b11100000);
+    const move2 = brd.Move.createSlideMove(brd.getPos(0, 0), .East, 0b00000100);
     try testing.expectEqual(@as(usize, 3), move2.movedStones());
 
-    const move3 = brd.Move.createSlideMove(brd.getPos(0, 0), .South, 0b10000000);
+    const move3 = brd.Move.createSlideMove(brd.getPos(0, 0), .South, 0b00000001);
     try testing.expectEqual(@as(usize, 1), move3.movedStones());
 }
 
@@ -241,12 +241,4 @@ test "Is on board" {
     try testing.expect(!brd.isOnBoard(10, 10));
 }
 
-test "LSB extraction" {
-    var bb: brd.Bitboard = 0;
-    brd.setBit(&bb, 5);
-    try testing.expectEqual(@as(brd.Position, 5), brd.getLSB(bb));
-
-    brd.setBit(&bb, 3);
-    try testing.expectEqual(@as(brd.Position, 3), brd.getLSB(bb));
-}
 

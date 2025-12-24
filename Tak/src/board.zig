@@ -220,7 +220,7 @@ pub const Move = packed struct(u16) {
     pub inline fn createPlaceMove(pos: Position, stone_type: StoneType) Move {
         return Move{
             .position = pos,
-            .flag = @as(u2, stone_type),
+            .flag = @intFromEnum(stone_type),
             .pattern = 0,
         };
     }
@@ -228,7 +228,7 @@ pub const Move = packed struct(u16) {
     pub inline fn createSlideMove(pos: Position, direction: Direction, pattern: u8) Move {
         return Move{
             .position = pos,
-            .flag = @as(u2, direction),
+            .flag = @intFromEnum(direction),
             .pattern = pattern,
         };
     }
