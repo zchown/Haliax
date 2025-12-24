@@ -75,8 +75,11 @@ fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_li
         std.debug.print("Depth {d}: Trying move {s}\n", .{depth, move_string});
         try mvs.makeMoveWithCheck(board, move);
         std.debug.print("Board after move:\n{s}\n", .{try tps.boardToTPS(allocator.*, board)});
+        std.debug.print("Halfmove count: {d}\n", .{board.half_move_count});
+        std.debug.print("black stones remaining: {d}\n", .{board.black_stones_remaining});
         const child_nodes = try perft(allocator, board, depth - 1, move_lists);
         try mvs.undoMoveWithCheck(board, move);
+        std.debug.print("After undoing move {s}, board is:\n{s}\n", .{move_string, try tps.boardToTPS(allocator.*, board)});
         nodes += child_nodes;
     }
 

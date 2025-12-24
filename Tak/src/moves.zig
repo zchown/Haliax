@@ -153,6 +153,12 @@ pub fn makeMoveWithCheck(board: *brd.Board, move: brd.Move) MoveError!void {
 }
 
 pub fn makeMove(board: *brd.Board, move: brd.Move) void {
+    defer {
+        board.to_move = board.to_move.opposite();
+        board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
+        board.half_move_count += 1;
+        zob.updateZobristHash(board, move);
+    }
     if (move.pattern == 0) {
 
         const place_color = if (board.half_move_count < 2) board.to_move.opposite() else board.to_move;
@@ -173,7 +179,7 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
 
         switch (@as(brd.StoneType, @enumFromInt(move.flag))) {
             .Flat => {
-                if (board.to_move == brd.Color.White) {
+                if (place_color == brd.Color.White) {
                     board.white_stones_remaining -= 1;
                 } else {
                     board.black_stones_remaining -= 1;
@@ -181,7 +187,7 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
             },
             .Standing => {
                 brd.setBit(&board.standing_stones, move.position);
-                if (board.to_move == brd.Color.White) {
+                if (place_color == brd.Color.White) {
                     board.white_stones_remaining -= 1;
                 } else {
                     board.black_stones_remaining -= 1;
@@ -189,13 +195,14 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
             },
             .Capstone => {
                 brd.setBit(&board.capstones, move.position);
-                if (board.to_move == brd.Color.White) {
+                if (place_color == brd.Color.White) {
                     board.white_capstones_remaining -= 1;
                 } else {
                     board.black_capstones_remaining -= 1;
                 }
             },
         }
+
         return;
     }
 
@@ -240,9 +247,6 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
     board.squares[move.position].remove(move.movedStones()) catch {
         unreachable;
     };
-    board.to_move = board.to_move.opposite();
-    board.half_move_count += 1;
-    zob.updateZobristHash(board, move);
 }
 
 pub fn checkUndoMove(board: brd.Board, move: brd.Move) MoveError!void {
@@ -259,10 +263,10 @@ pub fn checkUndoMove(board: brd.Board, move: brd.Move) MoveError!void {
 
         const top_stone = board.squares[move.position].top() orelse return MoveError.InvalidStone;
 
-        if (top_stone.color == color and board.half_move_count >= 2) {
+        if (top_stone.color != color and board.half_move_count > 2) {
             return MoveError.InvalidColor;
         } 
-        else if (top_stone.color != color and board.half_move_count < 2) {
+        else if (top_stone.color == color and board.half_move_count <= 2) {
             return MoveError.InvalidColor;
         }
 
@@ -326,20 +330,29 @@ pub fn checkUndoMove(board: brd.Board, move: brd.Move) MoveError!void {
 }
 
 pub fn undoMoveWithCheck(board: *brd.Board, move: brd.Move) MoveError!void {
+    std.debug.assert(board.half_move_count > 0);
     try checkUndoMove(board.*, move);
     try undoMove(board, move);
 }
 
 pub fn undoMove(board: *brd.Board, move: brd.Move) MoveError!void {
+    zob.updateZobristHash(board, move);
+    board.to_move = board.to_move.opposite();
+
+    // std.debug.print("Undoing move, halfmove_count: {d}\n", .{board.half_move_count});
+    defer {
+        board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
+        // std.debug.print("Undoing move, half_move_count before decrement: {d}\n", .{board.half_move_count});
+        board.half_move_count -= 1;
+    }
+
     if (move.pattern == 0) {
-        const color: brd.Color = board.to_move.opposite();
 
         const top_stone = board.squares[move.position].top() orelse unreachable;
+        const color = top_stone.color;
 
         const popped: brd.Piece = top_stone;
-        board.squares[move.position].remove(1) catch {
-            return MoveError.InvalidMove;
-        };
+        board.squares[move.position].remove(1) catch unreachable;
 
         brd.setBit(&board.empty_squares, move.position);
         if (color == brd.Color.White) {
@@ -374,8 +387,6 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) MoveError!void {
             },
         }
 
-        board.to_move = board.to_move.opposite();
-        board.half_move_count -= 1;
         return;
     }
 
@@ -441,11 +452,6 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) MoveError!void {
     while (k >= 0) : (k -= 1) {
         board.squares[move.position].push(popped[@intCast(k)]);
     }
-
-    board.to_move = board.to_move.opposite();
-    board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
-    board.half_move_count -= 1;
-    zob.updateZobristHash(board, move);
 }
 
 pub fn generateMoves(board: *const brd.Board, moves: *MoveList) !void {
@@ -538,6 +544,9 @@ fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
 
         for (dirs) |dir| {
             const max_steps = numSteps(board, @as(u6, @intCast(pos)), dir);
+            if (max_steps == 0) {
+                continue;
+            }
             var doing_crush: bool = false;
 
             // check if we can crush at the end

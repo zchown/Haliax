@@ -89,6 +89,7 @@ pub fn updateZobristHash(board: *brd.Board, move: brd.Move) void {
 
 fn updateSinglePositionHash(board: 
     *brd.Board, pos: brd.Position, piece: brd.Piece, depth: usize) void {
+
     const piece_type: usize = switch (piece.stone_type) {
         .Flat => 0,
         .Standing => 1,
