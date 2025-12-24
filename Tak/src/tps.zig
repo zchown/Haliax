@@ -187,68 +187,58 @@ fn updateBoardState(b: *Board) !void {
 pub fn boardToTPS(allocator: std.mem.Allocator, b: *const Board) ![]u8 {
     var buffer = try std.ArrayList(u8).initCapacity(allocator, 128);
     errdefer buffer.deinit(allocator);
-
     const writer = buffer.writer(allocator);
-
     try writer.writeAll("[TPS ");
-
     for (0..board_size) |row| {
         if (row > 0) {
             try writer.writeByte('/');
         }
-
         var empty_count: usize = 0;
-
+        var need_comma = false;
         for (0..board_size) |col| {
             const pos = brd.getPos(col, (board_size - 1) - row);
             const sq = &b.squares[pos];
-
             if (sq.len == 0) {
                 empty_count += 1;
             } else {
                 if (empty_count > 0) {
-                    if (col > 0) {
+                    if (need_comma) {
                         try writer.writeByte(',');
                     }
+                    try writer.writeByte('x');
                     if (empty_count > 1) {
                         try writer.print("{d}", .{empty_count});
                     }
-                    try writer.writeByte('x');
                     empty_count = 0;
+                    need_comma = true;
                 }
-
-                if (col > 0) {
+                if (need_comma) {
                     try writer.writeByte(',');
                 }
-
                 for (0..sq.len) |i| {
                     const piece = sq.stack[i].?;
-
                     const color_char: u8 = if (piece.color == .White) '1' else '2';
                     try writer.writeByte(color_char);
-
                     switch (piece.stone_type) {
                         .Flat => {},
                         .Standing => try writer.writeByte('S'),
                         .Capstone => try writer.writeByte('C'),
                     }
                 }
+                need_comma = true;
             }
         }
-
         if (empty_count > 0) {
-            if (empty_count < board_size) {
+            if (need_comma) {
                 try writer.writeByte(',');
             }
+            try writer.writeByte('x');
             if (empty_count > 1) {
                 try writer.print("{d}", .{empty_count});
             }
-            try writer.writeByte('x');
         }
     }
-
     const turn_char: u8 = if (b.to_move == .White) '1' else '2';
     try writer.print(" {c} {d}]", .{ turn_char, b.half_move_count });
-
     return buffer.toOwnedSlice(allocator);
 }

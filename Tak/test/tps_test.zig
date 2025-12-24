@@ -227,7 +227,7 @@ test "round trip - complex position" {
 
 test "round trip - full board" {
     const original = "[TPS 2,2,21S,2,2,2/2,x,222221,2,2,x/1,1,2221C,x,111112C,2S/x,1,2S,x2,121211212/1,1,1212S,1S,2,1S/x2,2,1,21,1 1 42]";
-    var board = try.parseTPS(original);
+    var board = try tps.parseTPS(original);
     const result = try tps.boardToTPS(testing.allocator, &board);
     defer testing.allocator.free(result);
 
