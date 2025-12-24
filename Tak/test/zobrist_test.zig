@@ -16,14 +16,14 @@ test "computeZobristHash - empty board" {
 
 test "computeZobristHash - with single piece" {
     var board1 = brd.Board.init();
-    board1.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board1.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
     zob.computeZobristHash(&board1);
 
     var board2 = brd.Board.init();
-    board2.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board2.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
@@ -34,14 +34,14 @@ test "computeZobristHash - with single piece" {
 
 test "computeZobristHash - different pieces" {
     var board1 = brd.Board.init();
-    board1.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board1.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
     zob.computeZobristHash(&board1);
 
     var board2 = brd.Board.init();
-    board2.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board2.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .Black,
     });
@@ -52,14 +52,14 @@ test "computeZobristHash - different pieces" {
 
 test "computeZobristHash - different positions" {
     var board1 = brd.Board.init();
-    board1.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board1.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
     zob.computeZobristHash(&board1);
 
     var board2 = brd.Board.init();
-    board2.squares[brd.getPos(1, 1)].push(brd.Piece{
+    board2.squares[brd.getPos(1, 1)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
@@ -70,14 +70,14 @@ test "computeZobristHash - different positions" {
 
 test "computeZobristHash - different stone types" {
     var board1 = brd.Board.init();
-    board1.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board1.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
     zob.computeZobristHash(&board1);
 
     var board2 = brd.Board.init();
-    board2.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board2.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Standing,
         .color = .White,
     });
@@ -88,22 +88,22 @@ test "computeZobristHash - different stone types" {
 
 test "computeZobristHash - stacked pieces" {
     var board1 = brd.Board.init();
-    board1.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board1.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
-    board1.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board1.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .Black,
     });
     zob.computeZobristHash(&board1);
 
     var board2 = brd.Board.init();
-    board2.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board2.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .Black,
     });
-    board2.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board2.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
@@ -117,7 +117,7 @@ test "updateZobristHash - place move" {
     const initial_hash = board.zobrist_hash;
 
     const move = brd.Move.createPlaceMove(brd.getPos(0, 0), .Flat);
-    board.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
@@ -133,7 +133,7 @@ test "updateZobristHash - place and undo" {
 
     const move = brd.Move.createPlaceMove(brd.getPos(0, 0), .Flat);
 
-    board.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
@@ -153,7 +153,7 @@ test "updateZobristHash matches computeZobristHash" {
     const move = brd.Move.createPlaceMove(brd.getPos(0, 0), .Flat);
     moves.makeMove(&board1, move);
 
-    board2.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board2.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .Black,
     });
@@ -169,17 +169,17 @@ test "zobrist hash collision resistance" {
     var board2 = brd.Board.init();
     var board3 = brd.Board.init();
 
-    board1.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board1.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
 
-    board2.squares[brd.getPos(5, 5)].push(brd.Piece{
+    board2.squares[brd.getPos(5, 5)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
 
-    board3.squares[brd.getPos(2, 3)].push(brd.Piece{
+    board3.squares[brd.getPos(2, 3)].pushPiece(brd.Piece{
         .stone_type = .Capstone,
         .color = .Black,
     });
@@ -196,28 +196,28 @@ test "zobrist hash collision resistance" {
 test "zobrist hash with complex position" {
     var board = brd.Board.init();
 
-    board.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
-    board.squares[brd.getPos(1, 1)].push(brd.Piece{
+    board.squares[brd.getPos(1, 1)].pushPiece(brd.Piece{
         .stone_type = .Standing,
         .color = .Black,
     });
-    board.squares[brd.getPos(2, 2)].push(brd.Piece{
+    board.squares[brd.getPos(2, 2)].pushPiece(brd.Piece{
         .stone_type = .Capstone,
         .color = .White,
     });
 
-    board.squares[brd.getPos(3, 3)].push(brd.Piece{
+    board.squares[brd.getPos(3, 3)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
-    board.squares[brd.getPos(3, 3)].push(brd.Piece{
+    board.squares[brd.getPos(3, 3)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .Black,
     });
-    board.squares[brd.getPos(3, 3)].push(brd.Piece{
+    board.squares[brd.getPos(3, 3)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
@@ -259,7 +259,7 @@ test "zobrist hash after slide move" {
     var board = brd.Board.init();
     board.half_move_count = 2; 
 
-    board.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
@@ -288,7 +288,7 @@ test "zobrist hash symmetry" {
 
     const move = brd.Move.createPlaceMove(brd.getPos(2, 2), .Flat);
 
-    board.squares[brd.getPos(2, 2)].push(brd.Piece{
+    board.squares[brd.getPos(2, 2)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
@@ -300,22 +300,22 @@ test "zobrist hash symmetry" {
 
 test "zobrist different depths in stack" {
     var board1 = brd.Board.init();
-    board1.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board1.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
-    board1.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board1.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .Black,
     });
     zob.computeZobristHash(&board1);
 
     var board2 = brd.Board.init();
-    board2.squares[brd.getPos(1, 1)].push(brd.Piece{
+    board2.squares[brd.getPos(1, 1)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
-    board2.squares[brd.getPos(1, 1)].push(brd.Piece{
+    board2.squares[brd.getPos(1, 1)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .Black,
     });

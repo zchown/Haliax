@@ -168,7 +168,7 @@ pub const Square = struct {
         return self.stack[self.len - 1];
     }
 
-    pub fn push(self: *Square, piece: Piece) void {
+    pub fn pushPiece(self: *Square, piece: Piece) void {
         self.stack[self.len] = piece;
         self.len += 1;
         switch (piece.color) {
@@ -177,7 +177,7 @@ pub const Square = struct {
         }
     }
 
-    pub fn remove(self: *Square, count: usize) !void {
+    pub fn removePieces(self: *Square, count: usize) !void {
         if (count > self.len) {
             return error.StackUnderflow;
         }
@@ -423,6 +423,82 @@ pub const Board = struct {
 
     pub fn isSquareEmpty(self: *const Board, pos: Position) bool {
         return self.squares[pos].len == 0;
+    }
+
+    pub fn recomputeBitboards(self: *Board) void {
+        self.white_control = 0;
+        self.black_control = 0;
+        self.empty_squares = 0;
+        self.standing_stones = 0;
+        self.capstones = 0;
+
+        for (0..num_squares) |pos| {
+            const sq = &self.squares[pos];
+
+            if (sq.len == 0) {
+                setBit(&self.empty_squares, @intCast(pos));
+            } else {
+                const top_piece = sq.top().?;
+
+                if (top_piece.color == .White) {
+                    setBit(&self.white_control, @intCast(pos));
+                } else {
+                    setBit(&self.black_control, @intCast(pos));
+                }
+
+                if (top_piece.stone_type == .Standing) {
+                    setBit(&self.standing_stones, @intCast(pos));
+                } else if (top_piece.stone_type == .Capstone) {
+                    setBit(&self.capstones, @intCast(pos));
+                }
+            }
+        }
+    }
+
+    pub fn pushPieceToSquare(self: *Board, pos: Position, piece: Piece) void {
+        self.squares[pos].pushPiece(piece);
+        // update bitboards
+        clearBit(&self.empty_squares, pos);
+        clearBit(&self.standing_stones, pos);
+        clearBit(&self.capstones, pos);
+        clearBit(&self.white_control, pos);
+        clearBit(&self.black_control, pos);
+        if (piece.stone_type == .Standing) {
+            setBit(&self.standing_stones, pos);
+        } else if (piece.stone_type == .Capstone) {
+            setBit(&self.capstones, pos);
+        }
+        if (piece.color == .White) {
+            setBit(&self.white_control, pos);
+        } else {
+            setBit(&self.black_control, pos);
+        }
+    }
+
+    pub fn removePiecesFromSquare(self: *Board, pos: Position, count: usize) !void {
+        const square = &self.squares[pos];
+
+        clearBit(&self.white_control, pos);
+        clearBit(&self.black_control, pos);
+        clearBit(&self.standing_stones, pos);
+        clearBit(&self.capstones, pos);
+
+        try square.removePieces(count);
+        if (square.len == 0) {
+            setBit(&self.empty_squares, pos);
+        } else {
+            const top_piece = square.top().?;
+            if (top_piece.stone_type == .Standing) {
+                setBit(&self.standing_stones, pos);
+            } else if (top_piece.stone_type == .Capstone) {
+                setBit(&self.capstones, pos);
+            }
+            if (top_piece.color == .White) {
+                setBit(&self.white_control, pos);
+            } else {
+                setBit(&self.black_control, pos);
+            }
+        }
     }
 };
 

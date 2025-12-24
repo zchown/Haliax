@@ -124,7 +124,7 @@ test "boardToTPS - empty board" {
 
 test "boardToTPS - with single piece" {
     var board = brd.Board.init();
-    board.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
@@ -137,7 +137,7 @@ test "boardToTPS - with single piece" {
 
 test "boardToTPS - with standing stone" {
     var board = brd.Board.init();
-    board.squares[brd.getPos(5, 5)].push(brd.Piece{
+    board.squares[brd.getPos(5, 5)].pushPiece(brd.Piece{
         .stone_type = .Standing,
         .color = .White,
     });
@@ -150,7 +150,7 @@ test "boardToTPS - with standing stone" {
 
 test "boardToTPS - with capstone" {
     var board = brd.Board.init();
-    board.squares[brd.getPos(2, 3)].push(brd.Piece{
+    board.squares[brd.getPos(2, 3)].pushPiece(brd.Piece{
         .stone_type = .Capstone,
         .color = .Black,
     });
@@ -163,11 +163,11 @@ test "boardToTPS - with capstone" {
 
 test "boardToTPS - with stack" {
     var board = brd.Board.init();
-    board.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
-    board.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .Black,
     });

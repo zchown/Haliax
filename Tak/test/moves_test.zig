@@ -59,7 +59,7 @@ test "checkMove - valid place moves" {
 test "checkMove - invalid position" {
     var board = brd.Board.init();
 
-    board.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
@@ -141,7 +141,7 @@ test "makeMove - simple slide" {
     var board = brd.Board.init();
     board.half_move_count = 2; 
 
-    board.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
@@ -158,13 +158,13 @@ test "makeMove - slide with crush" {
     var board = brd.Board.init();
     board.half_move_count = 2;
 
-    board.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Capstone,
         .color = .White,
     });
     brd.setBit(&board.white_control, brd.getPos(0, 0));
 
-    board.squares[brd.getPos(0, 1)].push(brd.Piece{
+    board.squares[brd.getPos(0, 1)].pushPiece(brd.Piece{
         .stone_type = .Standing,
         .color = .Black,
     });
@@ -201,7 +201,7 @@ test "undoMove - slide move" {
     var board = brd.Board.init();
     board.half_move_count = 2;
 
-    board.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
@@ -244,7 +244,7 @@ test "generateMoves - with pieces on board" {
     var board = brd.Board.init();
     board.half_move_count = 2;
 
-    board.squares[brd.getPos(2, 2)].push(brd.Piece{
+    board.squares[brd.getPos(2, 2)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
@@ -275,7 +275,7 @@ test "checkUndoMove - invalid stack height" {
     const move = brd.Move.createPlaceMove(brd.getPos(0, 0), .Flat);
     moves.makeMove(&board, move);
 
-    board.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .Black,
     });
@@ -315,7 +315,7 @@ test "slide move with multiple drops" {
     board.half_move_count = 2;
 
     for (0..3) |_| {
-        board.squares[brd.getPos(0, 0)].push(brd.Piece{
+        board.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
             .stone_type = .Flat,
             .color = .White,
         });

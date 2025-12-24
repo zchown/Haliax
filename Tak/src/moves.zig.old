@@ -168,21 +168,17 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
 
         const place_color = if (board.half_move_count < 2) board.to_move.opposite() else board.to_move;
 
-        // board.squares[move.position].push(brd.Piece{
-        //     .color = place_color,
-        //     .stone_type = @enumFromInt(move.flag),
-        // });
-        board.pushPieceToSquare(move.position, brd.Piece{
+        board.squares[move.position].push(brd.Piece{
             .color = place_color,
             .stone_type = @enumFromInt(move.flag),
         });
 
-        // if (board.to_move == brd.Color.White) {
-        //     brd.setBit(&board.white_control, move.position);
-        // }
-        // else {
-        //     brd.setBit(&board.black_control, move.position);
-        // }
+        if (board.to_move == brd.Color.White) {
+            brd.setBit(&board.white_control, move.position);
+        }
+        else {
+            brd.setBit(&board.black_control, move.position);
+        }
 
         brd.clearBit(&board.empty_squares, move.position);
 
@@ -232,6 +228,7 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
 
     var started: bool = false;
     var cur_pos: brd.Position = move.position;
+
     var stones_moved: usize = 0;
     for (0..8) |i| {
         const bit = (move.pattern >> (7 - @as(u3, @intCast(i)))) & 0x1;
@@ -243,19 +240,38 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
             }
         }
         if (bit == 1) {
+            // update bitboard for for cur_pos before moving to next position
+            brd.clearBit(&board.white_control, cur_pos);
+            brd.clearBit(&board.black_control, cur_pos);
+            brd.clearBit(&board.standing_stones, cur_pos);
+            brd.clearBit(&board.capstones, cur_pos);
+            if (board.squares[cur_pos].len == 0) {
+                brd.setBit(&board.empty_squares, cur_pos);
+            }
+            else {
+                if (board.squares[cur_pos].top()) |top_stone| {
+                    if (top_stone.color == brd.Color.White) {
+                        brd.setBit(&board.white_control, cur_pos);
+                    } else {
+                        brd.setBit(&board.black_control, cur_pos);
+                    }
+                    if (top_stone.stone_type == brd.StoneType.Standing) {
+                        brd.setBit(&board.standing_stones, cur_pos);
+                    }
+                    else if (top_stone.stone_type == brd.StoneType.Capstone) {
+                        brd.setBit(&board.capstones, cur_pos);
+                    }
+                }
+            }
+
             cur_pos = brd.nextPosition(cur_pos, dir) orelse unreachable;
         }
+
         const stack_index = board.squares[move.position].len - 1 - stones_moved;
         const to_move: brd.Piece = board.squares[move.position].stack[stack_index].?;
-        // board.squares[cur_pos].push(to_move);
-        board.pushPieceToSquare(cur_pos, to_move);
+        board.squares[cur_pos].push(to_move);
         stones_moved += 1;
     }
-
-    // board.squares[move.position].remove(move.movedStones()) catch unreachable;
-    board.removePiecesFromSquare(move.position, stones_moved) catch unreachable;
-
-    cur_pos = move.position;
 }
 
 pub fn checkUndoMove(board: brd.Board, move: brd.Move) MoveError!void {
@@ -345,6 +361,8 @@ pub fn undoMoveWithCheck(board: *brd.Board, move: brd.Move) MoveError!void {
 }
 
 pub fn undoMove(board: *brd.Board, move: brd.Move) void {
+    zob.updateZobristHash(board, move);
+    board.to_move = board.to_move.opposite();
 
     // std.debug.print("Undoing move, halfmove_count: {d}\n", .{board.half_move_count});
     defer {
@@ -354,21 +372,19 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
     }
 
     if (move.pattern == 0) {
-        zob.updateZobristHash(board, move);
-        board.to_move = board.to_move.opposite();
+
         const top_stone = board.squares[move.position].top() orelse unreachable;
         const color = top_stone.color;
 
         const popped: brd.Piece = top_stone;
-        // board.squares[move.position].remove(1) catch unreachable;
-        board.removePiecesFromSquare(move.position, 1) catch unreachable;
+        board.squares[move.position].remove(1) catch unreachable;
 
-        // brd.setBit(&board.empty_squares, move.position);
-        // if (color == brd.Color.White) {
-        //     brd.clearBit(&board.white_control, move.position);
-        // } else {
-        //     brd.clearBit(&board.black_control, move.position);
-        // }
+        brd.setBit(&board.empty_squares, move.position);
+        if (color == brd.Color.White) {
+            brd.clearBit(&board.white_control, move.position);
+        } else {
+            brd.clearBit(&board.black_control, move.position);
+        }
 
         switch (popped.stone_type) {
             .Flat => {
@@ -399,9 +415,7 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
         return;
     }
 
-
     // slide move
-    board.to_move = board.to_move.opposite();
     const dir: brd.Direction = @enumFromInt(move.flag);
     const length: usize = @popCount(move.pattern);
     const end_pos = brd.nthPositionFrom(move.position, dir, length) orelse unreachable;
@@ -440,8 +454,7 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
         const pos = positions[@intCast(j)];
 
         const top_piece: brd.Piece = board.squares[pos].stack[board.squares[pos].len - 1] orelse unreachable;
-        // board.squares[pos].remove(1) catch unreachable;
-        board.removePiecesFromSquare(pos, 1) catch unreachable;
+        board.squares[pos].remove(1) catch unreachable;
         popped[pidx] = top_piece;
         pidx += 1;
     }
@@ -454,10 +467,8 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
 
     var k: isize = @as(isize, @intCast(pidx)) - 1;
     while (k >= 0) : (k -= 1) {
-        // board.squares[move.position].push(popped[@intCast(k)]);
-        board.pushPieceToSquare(move.position, popped[@intCast(k)]);
+        board.squares[move.position].push(popped[@intCast(k)]);
     }
-    zob.updateZobristHash(board, move);
 }
 
 pub fn generateMoves(board: *const brd.Board, moves: *MoveList) !void {
@@ -566,6 +577,7 @@ fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
                 }
             }
 
+            std.debug.assert(max_pickup >= 1);
             const patterns = sym.patterns.patterns[max_pickup - 1][max_steps - 1];
             if (moves.count + patterns.len > moves.capacity) {
                 try moves.resize(moves.capacity * 2);

@@ -77,8 +77,19 @@ fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_li
             try mvs.makeMoveWithCheck(board, move);
             const child_nodes = try perft(allocator, board, depth - 1, move_lists);
             try mvs.undoMoveWithCheck(board, move);
-            const post_hash = board.zobrist_hash;
-            std.debug.assert(pre_hash == post_hash);
+            // if (pre_hash != board.zobrist_hash) {
+            //     std.debug.print("Zobrist hash mismatch detected!\n", .{});
+            //     const tps_str = try tps.boardToTPS(allocator.*, board);
+            //     defer allocator.free(tps_str);
+            //     std.debug.print("Current TPS: {s}\n", .{tps_str});
+            //
+            //     const move_ptn = try ptn.moveToString(allocator, move, board.to_move);
+            //     defer allocator.free(move_ptn);
+            //     std.debug.print("Offending move: {s}\n", .{move_ptn});
+            //
+            //     return error.ZobristHashMismatch;
+            // }
+            std.debug.assert(pre_hash == board.zobrist_hash);
             nodes += child_nodes;
         } 
         else {

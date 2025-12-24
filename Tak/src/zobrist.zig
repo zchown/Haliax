@@ -71,8 +71,6 @@ pub fn updateZobristHash(board: *brd.Board, move: brd.Move) void {
     }
 
     else {
-        // cheating for now, just recompute the whole hash
-        // may actually be faster anyway just because of the complexity of slide moves
         computeZobristHash(board);
     }
 }

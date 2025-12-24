@@ -123,7 +123,7 @@ fn parseStack(b: *Board, pos: Position, token: []const u8) !void {
             ._padding = 0,
         };
 
-        sq.push(piece);
+        sq.pushPiece(piece);
     }
 }
 

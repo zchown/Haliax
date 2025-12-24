@@ -109,7 +109,7 @@ test "Square operations" {
         .color = .White,
     };
 
-    square.push(white_flat);
+    square.pushPiece(white_flat);
     try testing.expectEqual(@as(usize, 1), square.len);
     try testing.expectEqual(@as(usize, 1), square.white_count);
     try testing.expectEqual(@as(usize, 0), square.black_count);
@@ -124,12 +124,12 @@ test "Square operations" {
         .color = .Black,
     };
 
-    square.push(black_cap);
+    square.pushPiece(black_cap);
     try testing.expectEqual(@as(usize, 2), square.len);
     try testing.expectEqual(@as(usize, 1), square.white_count);
     try testing.expectEqual(@as(usize, 1), square.black_count);
 
-    try square.remove(1);
+    try square.removePieces(1);
     try testing.expectEqual(@as(usize, 1), square.len);
     try testing.expectEqual(@as(usize, 0), square.black_count);
 }
@@ -187,7 +187,7 @@ test "Empty square check" {
     try testing.expect(board.isSquareEmpty(brd.getPos(0, 0)));
     try testing.expect(board.isSquareEmpty(brd.getPos(5, 5)));
 
-    board.squares[brd.getPos(0, 0)].push(brd.Piece{
+    board.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
