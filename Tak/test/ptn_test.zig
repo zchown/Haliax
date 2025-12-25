@@ -133,6 +133,20 @@ test "moveToString - simple slide" {
     try testing.expectEqual(@as(u8, '+'), str[2]);
 }
 
+test "moveToString - slide" {
+    var allocator = testing.allocator;
+    const move = brd.Move.createSlideMove(brd.getPos(4, 0), .North, 0b00000100);
+    const str = try ptn.moveToString(&allocator, move, .White);
+    defer allocator.free(str);
+    // std.debug.print("Slide move string: {s}\n", .{str});
+
+    try testing.expect(str.len >= 4);
+    try testing.expectEqual(@as(u8, '3'), str[0]);
+    try testing.expectEqual(@as(u8, 'e'), str[1]);
+    try testing.expectEqual(@as(u8, '1'), str[2]);
+    try testing.expectEqual(@as(u8, '+'), str[3]);
+}
+
 test "parsePTN - empty content" {
     var p = try ptn.parsePTN(testing.allocator, "");
     defer p.deinit();
@@ -312,10 +326,14 @@ test "round trip - slide moves" {
         "b2-",
         "c3>",
         "d4<",
+        "3e1+",
+        "3e1+12",
     };
 
     for (test_cases) |original| {
         const move = try ptn.parseMove(original, .White);
+        // move.print();
+
         const converted = try ptn.moveToString(&allocator, move, .White);
         defer allocator.free(converted);
 

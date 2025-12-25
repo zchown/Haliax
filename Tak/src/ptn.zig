@@ -122,10 +122,22 @@ pub fn parseMove(move_str: []const u8, color: brd.Color) PTNParseError!brd.Move 
 }
 
 fn parseSlideMove(str: []const u8, crush: bool) PTNParseError!brd.Move {
-    _ = crush;
-
     var ptr: usize = 0;
     var count: u8 = 1;
+
+    if (str.len == 3 or (str.len == 4 and crush)) {
+        const pos = try parsePosition(str[0 .. 2]);
+        const dir = try charToDirection(str[2]);
+        return brd.Move.createSlideMove(pos, dir, 1);
+    } 
+    else if (str.len == 4 or (str.len == 5 and crush)) {
+        const pos = try parsePosition(str[1 .. 3]);
+        const dir = try charToDirection(str[3]);
+        const drop = str[0];
+        var pattern: u8 = 1;
+        pattern <<= @as(u3, @intCast((drop - '0') - 1));
+        return brd.Move.createSlideMove(pos, dir, pattern);
+    }
 
     if (ptr < str.len and std.ascii.isDigit(str[ptr])) {
         count = str[ptr] - '0';
@@ -140,19 +152,25 @@ fn parseSlideMove(str: []const u8, crush: bool) PTNParseError!brd.Move {
     const dir = try charToDirection(str[ptr]);
     ptr += 1;
 
-    var pattern: u8 = 0;
-    var drop_count: u8 = 0;
-
-    while (ptr < str.len and std.ascii.isDigit(str[ptr])) {
-        if (drop_count >= 5) return PTNParseError.CountError;
-        const drop_value = str[ptr] - '0';
-        pattern |= @as(u8, drop_value) << @intCast(drop_count * 3);
-        drop_count += 1;
+    var pattern_array: [8]u1 = [_]u1{0, 0, 0, 0, 0, 0, 0, 0};
+    var idx = 8 - count;
+    while (ptr < str.len and idx < 8) {
+        if (!std.ascii.isDigit(str[ptr])) {
+            return PTNParseError.CountError;
+        }
+        const cur = str[ptr] - '0';
         ptr += 1;
+        // std.debug.print("Drop count: {d} at index {d}\n", .{cur, idx});
+        pattern_array[idx] = 1;
+        idx += cur;
     }
 
-    if (drop_count == 0) {
-        pattern = count;
+    var pattern: u8 = 0;
+    // convert pattern_array to pattern
+    for (0..8) |i| {
+        // std.debug.print("pattern_array[{d}] = {d}\n", .{i, pattern_array[i]});
+        pattern <<= 1;
+        pattern |= pattern_array[i];
     }
 
     return brd.Move.createSlideMove(pos, dir, pattern);
@@ -216,21 +234,10 @@ pub fn moveToString(allocator: *std.mem.Allocator, move: brd.Move, color: brd.Co
         const dir: brd.Direction = @enumFromInt(move.flag);
         const dir_char = directionToChar(dir);
 
-        var pickup_count: u8 = 0;
-        var drops = try std.ArrayList(u8).initCapacity(allocator.*, brd.max_pickup);
-        defer drops.deinit(allocator.*);
-
-        var temp_pattern = move.pattern;
-        while (temp_pattern > 0) {
-            const drop = @as(u8, @intCast(temp_pattern & 0b111));
-            try drops.append(allocator.*, drop);
-            pickup_count += drop;
-            temp_pattern >>= 3;
-        }
-
         var result = try std.ArrayList(u8).initCapacity(allocator.*, 16);
         defer result.deinit(allocator.*);
 
+        const pickup_count: u8 = @intCast(move.movedStones());
         if (pickup_count > 1) {
             try result.append(allocator.*, '0' + pickup_count);
         }
@@ -240,9 +247,28 @@ pub fn moveToString(allocator: *std.mem.Allocator, move: brd.Move, color: brd.Co
 
         try result.append(allocator.*, dir_char);
 
-        if (drops.items.len > 1) {
-            for (drops.items) |drop| {
-                try result.append(allocator.*, '0' + drop);
+        if (pickup_count > 1) {
+            var drops: [8]u8 = [_]u8{'0', '0', '0', '0', '0', '0', '0', '0'};
+
+            // iterate through pattern bits
+            var drop_idx: usize = 0;
+            for (0..8) |i| {
+                const bit = (move.pattern >> (7 - @as(u3, @intCast(i)))) & 1;
+                if (bit == 1) {
+                    drop_idx += 1;
+                }
+
+                if (drop_idx >= 1) {
+                    drops[drop_idx - 1] += 1;
+                }
+            }
+
+            if (drops[1] != '0') {
+                for (0..8) |i| {
+                    if (drops[i] > '0') {
+                        try result.append(allocator.*, drops[i]);
+                    }
+                }
             }
         }
 
