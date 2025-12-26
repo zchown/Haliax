@@ -1,5 +1,8 @@
 const std = @import("std");
 const zob = @import("zobrist");
+const tracy = @import("tracy");
+// const build_options = @import("build_options");
+const tracy_enable = tracy.build_options.enable_tracy;
 
 pub const board_size = 6;
 pub const num_squares = board_size * board_size;
@@ -348,6 +351,10 @@ pub const Board = struct {
     }
 
     pub fn checkResult(self: *Board) Result {
+        if (tracy_enable) {
+            const z = tracy.trace(@src());
+            defer z.end();
+        }
         self.updateResult();
         return self.game_status;
     }

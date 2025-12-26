@@ -3,6 +3,9 @@ const brd = @import("board");
 const sym = @import("sympathy");
 const zob = @import("zobrist");
 const magic = @import("magics.zig");
+const tracy = @import("tracy");
+
+const tracy_enable = tracy.build_options.enable_tracy;
 
 pub const MoveList = struct {
     moves: []brd.Move,
@@ -162,6 +165,10 @@ pub fn makeMoveWithCheck(board: *brd.Board, move: brd.Move) MoveError!void {
 }
 
 pub fn makeMove(board: *brd.Board, move: brd.Move) void {
+    if (tracy_enable) {
+        const z = tracy.trace(@src());
+        defer z.end();
+    }
     var did_crush: bool = false;
 
     defer {
@@ -359,6 +366,10 @@ pub fn undoMoveWithCheck(board: *brd.Board, move: brd.Move) MoveError!void {
     undoMove(board, move);
 }
 pub fn undoMove(board: *brd.Board, move: brd.Move) void {
+    if (tracy_enable) {
+        const z = tracy.trace(@src());
+        defer z.end();
+    }
     defer {
         board.half_move_count -= 1;
         board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
@@ -445,7 +456,10 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
 }
 
 pub fn generateMoves(board: *const brd.Board, moves: *MoveList) !void {
-
+    if (tracy_enable) {
+        const z = tracy.trace(@src());
+        defer z.end();
+    }
     if (board.half_move_count < 2) {
          for (0..brd.board_size * brd.board_size) |pos| {
             if (brd.getBit(board.empty_squares, @as(u6, @intCast(pos)))) {
@@ -465,6 +479,10 @@ pub fn generateMoves(board: *const brd.Board, moves: *MoveList) !void {
 }
 
 fn generatePlaceMoves(board: *const brd.Board, moves: *MoveList) !void {
+    if (tracy_enable) {
+        const z = tracy.trace(@src());
+        defer z.end();
+    }
     const color: brd.Color = board.to_move;
      for (0..brd.board_size * brd.board_size) |pos| {
         if (brd.getBit(board.empty_squares, @as(u6, @intCast(pos)))) {
@@ -514,6 +532,10 @@ fn generatePlaceMoves(board: *const brd.Board, moves: *MoveList) !void {
 }
 
 fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
+    if (tracy_enable) {
+        const z = tracy.trace(@src());
+        defer z.end();
+    }
     const color: brd.Color = board.to_move;
     const color_bits = if (color == brd.Color.White) board.white_control else board.black_control;
 

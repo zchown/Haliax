@@ -4,6 +4,17 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const tracy = b.option([]const u8, "tracy", "Enable Tracy integration. Supply path to Tracy source");
+    const tracy_callstack = b.option(bool, "tracy-callstack", "Include callstack information with Tracy data. Does nothing if -Dtracy is not provided") orelse (tracy != null);
+    const tracy_allocation = b.option(bool, "tracy-allocation", "Include allocation information with Tracy data. Does nothing if -Dtracy is not provided") orelse (tracy != null);
+    const tracy_callstack_depth: u32 = b.option(u32, "tracy-callstack-depth", "Declare callstack depth for Tracy data. Does nothing if -Dtracy-callstack is not provided") orelse 10;
+
+    const tracy_module = b.createModule(.{
+        .root_source_file = b.path("Tracy/tracy.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     const board_module = b.createModule(.{
         .root_source_file = b.path("Tak/src/board.zig"),
         .target = target,
@@ -41,6 +52,7 @@ pub fn build(b: *std.Build) void {
     });
 
     board_module.addImport("zobrist", zobrist_module);
+    board_module.addImport("tracy", tracy_module);
 
     zobrist_module.addImport("board", board_module);
 
@@ -49,6 +61,7 @@ pub fn build(b: *std.Build) void {
     moves_module.addImport("board", board_module);
     moves_module.addImport("sympathy", sympathy_module);
     moves_module.addImport("zobrist", zobrist_module);
+    moves_module.addImport("tracy", tracy_module);
 
     ptn_module.addImport("board", board_module);
 
@@ -69,8 +82,28 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addImport("tps", tps_module);
     exe.root_module.addImport("zobrist", zobrist_module);
     exe.root_module.addImport("sympathy", sympathy_module);
+    exe.root_module.addImport("tracy", tracy_module);
 
     b.installArtifact(exe);
+
+    const exe_options = b.addOptions();
+    exe.root_module.addOptions("build_options", exe_options);
+    tracy_module.addOptions("build_options", exe_options);
+
+    exe_options.addOption(bool, "enable_tracy", tracy != null);
+    exe_options.addOption(bool, "enable_tracy_callstack", tracy_callstack);
+    exe_options.addOption(bool, "enable_tracy_allocation", tracy_allocation);
+    exe_options.addOption(u32, "tracy_callstack_depth", tracy_callstack_depth);
+
+    if (tracy) |tracy_path| {
+        const client_cpp = b.pathJoin(&[_][]const u8{ tracy_path, "public", "TracyClient.cpp" });
+        const tracy_c_flags: []const []const u8 = &.{ "-DTRACY_ENABLE=1", "-fno-sanitize=undefined" };
+
+        exe.root_module.addIncludePath(.{ .cwd_relative = tracy_path });
+        exe.root_module.addCSourceFile(.{ .file = .{ .cwd_relative = client_cpp }, .flags = tracy_c_flags });
+        exe.root_module.linkSystemLibrary("c++", .{ .use_pkg_config = .no });
+        exe.root_module.link_libc = true;
+    }
 
     const run_step = b.step("run", "Run the app");
     const run_cmd = b.addRunArtifact(exe);
@@ -106,6 +139,25 @@ pub fn build(b: *std.Build) void {
         test_exe.root_module.addImport("tps", tps_module);
         test_exe.root_module.addImport("zobrist", zobrist_module);
         test_exe.root_module.addImport("sympathy", sympathy_module);
+        test_exe.root_module.addImport("tracy", tracy_module);
+
+        const test_options = b.addOptions();
+        test_exe.root_module.addOptions("build_options", test_options);
+
+        test_options.addOption(bool, "enable_tracy", tracy != null);
+        test_options.addOption(bool, "enable_tracy_callstack", tracy_callstack);
+        test_options.addOption(bool, "enable_tracy_allocation", tracy_allocation);
+        test_options.addOption(u32, "tracy_callstack_depth", tracy_callstack_depth);
+
+        if (tracy) |tracy_path| {
+            const client_cpp = b.pathJoin(&[_][]const u8{ tracy_path, "public", "TracyClient.cpp" });
+            const tracy_c_flags: []const []const u8 = &.{ "-DTRACY_ENABLE=1", "-fno-sanitize=undefined" };
+
+            test_exe.root_module.addIncludePath(.{ .cwd_relative = tracy_path });
+            test_exe.root_module.addCSourceFile(.{ .file = .{ .cwd_relative = client_cpp }, .flags = tracy_c_flags });
+            test_exe.root_module.linkSystemLibrary("c++", .{ .use_pkg_config = .no });
+            test_exe.root_module.link_libc = true;
+        }
 
         const run_test = b.addRunArtifact(test_exe);
 
@@ -117,3 +169,4 @@ pub fn build(b: *std.Build) void {
         individual_test_step.dependOn(&run_test.step);
     }
 }
+
