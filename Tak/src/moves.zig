@@ -599,3 +599,87 @@ pub fn numSteps(board: *const brd.Board, start: brd.Position, dir: brd.Direction
     }
     return steps;
 }
+
+pub fn countMoves(board: *const brd.Board) !usize {
+
+    if (board.half_move_count < 2) {
+        return @as(usize, @intCast(@popCount(board.empty_squares)));
+    }
+
+    var total: usize = 0;
+    total += try countPlaceMoves(board);
+    total += try countSlideMoves(board);
+    return total;
+}
+
+fn countPlaceMoves(board: *const brd.Board) !usize {
+    const color: brd.Color = board.to_move;
+    const stones = if (color == brd.Color.White) board.white_stones_remaining else board.black_stones_remaining;
+    const capstones = if (color == brd.Color.White) board.white_capstones_remaining else board.black_capstones_remaining;
+
+    var total: usize = 0;
+    if (stones > 0) {
+        total += @as(usize, @intCast(@popCount(board.empty_squares) * 2));
+    }
+    if (capstones > 0) {
+        total += @as(usize, @intCast(@popCount(board.empty_squares)));
+    }
+    return total;
+}
+
+fn countSlideMoves(board: *const brd.Board) !usize {
+    const color: brd.Color = board.to_move;
+    const color_bits = if (color == brd.Color.White) board.white_control else board.black_control;
+
+    var total: usize = 0;
+
+    for (0..brd.board_size * brd.board_size) |pos| {
+        if (!brd.getBit(color_bits, @as(u6, @intCast(pos)))) {
+            continue;
+        }
+        var can_crush: bool = false;
+        if (board.squares[pos].top()) |top_stone| {
+            if (top_stone.stone_type == brd.StoneType.Capstone) {
+                can_crush = true;
+            }
+        }
+
+        const max_pickup = if (board.squares[pos].len < brd.max_pickup) board.squares[pos].len else brd.max_pickup;
+
+        const dirs: [4]brd.Direction = .{ .North, .South, .East, .West };
+
+        for (dirs) |dir| {
+            var max_steps = numSteps(board, @as(u6, @intCast(pos)), dir);
+            if (max_steps > max_pickup) {
+                max_steps = max_pickup;
+            }
+
+            var doing_crush: bool = false;
+
+            // check if we can crush at the end
+            if (can_crush and max_steps < brd.max_pickup) {
+                // std.debug.print("Checking crush move from pos {d} in dir {} with max_steps {d}\n", .{pos, dir, max_steps});
+                if (brd.nthPositionFrom(@as(u6, @intCast(pos)), dir, max_steps + 1)) |end_pos| {
+                    if (board.squares[end_pos].top()) |stone| {
+                        if (stone.stone_type == brd.StoneType.Standing) {
+                            // std.debug.print("Can do crush move from pos {d} to {d} in dir {}\n", .{pos, end_pos, dir});
+                            doing_crush = true;
+                        }
+                    }
+                }
+            }
+
+            if (max_steps != 0) {
+                const patterns = sym.patterns.patterns[max_pickup - 1][max_steps - 1];
+
+                total += patterns.len;
+            }
+
+            if (doing_crush) {
+                const crush_patterns = sym.patterns.crush_patterns[max_pickup - 1][max_steps];
+                total += crush_patterns.len;
+            }
+        }
+    }
+    return total;
+}
