@@ -358,10 +358,9 @@ pub fn undoMoveWithCheck(board: *brd.Board, move: brd.Move) MoveError!void {
     undoMove(board, move);
 }
 pub fn undoMove(board: *brd.Board, move: brd.Move) void {
-
     defer {
-        board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
         board.half_move_count -= 1;
+        board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
     }
 
     if (move.pattern == 0) {
@@ -436,8 +435,9 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
         board.pushPieceToSquare(move.position, piece_buffer[piece_count - 1 - j]);
     }
 
-    if (board.crushMoves[board.half_move_count % brd.crush_map_size] == .Crush) {
+    if (board.crushMoves[board.half_move_count - 1 % brd.crush_map_size] == .Crush) {
         board.squares[end_pos].stack[board.squares[end_pos].len - 1].?.stone_type = brd.StoneType.Standing;
+        board.standing_stones |= brd.getPositionBB(end_pos);
     }
 
     zob.updateZobristHash(board, move);
@@ -523,6 +523,7 @@ fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
         var can_crush: bool = false;
         if (board.squares[pos].top()) |top_stone| {
             if (top_stone.stone_type == brd.StoneType.Capstone) {
+                // std.debug.print("Can crush from position {d}\n", .{pos});
                 can_crush = true;
             }
         }
@@ -537,37 +538,38 @@ fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
                 max_steps = max_pickup;
             }
 
-            if (max_steps == 0) {
-                continue;
-            }
             var doing_crush: bool = false;
 
             // check if we can crush at the end
             if (can_crush and max_steps < brd.max_pickup) {
-                if (brd.nthPositionFrom(@as(u6, @intCast(pos)), dir, max_steps)) |end_pos| {
+                // std.debug.print("Checking crush move from pos {d} in dir {} with max_steps {d}\n", .{pos, dir, max_steps});
+                if (brd.nthPositionFrom(@as(u6, @intCast(pos)), dir, max_steps + 1)) |end_pos| {
                     if (board.squares[end_pos].top()) |stone| {
                         if (stone.stone_type == brd.StoneType.Standing) {
+                            // std.debug.print("Can do crush move from pos {d} to {d} in dir {}\n", .{pos, end_pos, dir});
                             doing_crush = true;
                         }
                     }
                 }
             }
 
-            const patterns = sym.patterns.patterns[max_pickup - 1][max_steps - 1];
+            if (max_steps != 0) {
+                const patterns = sym.patterns.patterns[max_pickup - 1][max_steps - 1];
 
-            if (moves.count + patterns.len > moves.capacity) {
-                try moves.resize(moves.capacity * 2);
-            }
-            for (0..patterns.len) |pattern| {
-                moves.appendUnsafe(brd.Move{
-                    .position = @as(u6, @intCast(pos)),
-                    .pattern = patterns.items[pattern],
-                    .flag = @intFromEnum(dir),
-                });
+                if (moves.count + patterns.len > moves.capacity) {
+                    try moves.resize(moves.capacity * 2);
+                }
+                for (0..patterns.len) |pattern| {
+                    moves.appendUnsafe(brd.Move{
+                        .position = @as(u6, @intCast(pos)),
+                        .pattern = patterns.items[pattern],
+                        .flag = @intFromEnum(dir),
+                    });
+                }
             }
 
             if (doing_crush) {
-                const crush_patterns = sym.patterns.crush_patterns[max_pickup - 1][max_steps - 1];
+                const crush_patterns = sym.patterns.crush_patterns[max_pickup - 1][max_steps];
                 if (moves.count + crush_patterns.len > moves.capacity) {
                     try moves.resize(moves.capacity * 2);
                 }
