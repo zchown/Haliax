@@ -184,21 +184,10 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
 
         const place_color = if (board.half_move_count < 2) board.to_move.opposite() else board.to_move;
 
-        // board.squares[move.position].push(brd.Piece{
-        //     .color = place_color,
-        //     .stone_type = @enumFromInt(move.flag),
-        // });
         board.pushPieceToSquare(move.position, brd.Piece{
             .color = place_color,
             .stone_type = @enumFromInt(move.flag),
         });
-
-        // if (board.to_move == brd.Color.White) {
-        //     brd.setBit(&board.white_control, move.position);
-        // }
-        // else {
-        //     brd.setBit(&board.black_control, move.position);
-        // }
 
         brd.clearBit(&board.empty_squares, move.position);
 
@@ -306,7 +295,7 @@ pub fn checkUndoMove(board: brd.Board, move: brd.Move) MoveError!void {
     const dir: brd.Direction = @enumFromInt(move.flag);
     const length: usize = @popCount(move.pattern);
     const end_pos = brd.nthPositionFrom(move.position, dir, length) orelse return MoveError.InvalidPattern;
-    
+
     var cur_pos = move.position;
     while (cur_pos != end_pos) {
         if (board.squares[cur_pos].top()) |stone| {
@@ -324,7 +313,7 @@ pub fn checkUndoMove(board: brd.Board, move: brd.Move) MoveError!void {
     var started: bool = false;
     cur_pos= move.position;
 
-     for (0..8) |i| {
+    for (0..8) |i| {
         const bit = (move.pattern >> (7 - @as(u3, @intCast(i)))) & 0x1;
 
         if (!started) {
@@ -425,7 +414,7 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
     var piece_count: usize = 0;
 
     // iterate backwards through pattern
-     for (0..8) |i| {
+    for (0..8) |i| {
 
         if (cur_pos == move.position) {
             break;
@@ -461,7 +450,7 @@ pub fn generateMoves(board: *const brd.Board, moves: *MoveList) !void {
         defer z.end();
     }
     if (board.half_move_count < 2) {
-         for (0..brd.board_size * brd.board_size) |pos| {
+        for (0..brd.board_size * brd.board_size) |pos| {
             if (brd.getBit(board.empty_squares, @as(u6, @intCast(pos)))) {
                 // will always have at least this much capacity to start
                 moves.appendUnsafe(brd.Move{
@@ -484,48 +473,28 @@ fn generatePlaceMoves(board: *const brd.Board, moves: *MoveList) !void {
         defer z.end();
     }
     const color: brd.Color = board.to_move;
-     for (0..brd.board_size * brd.board_size) |pos| {
+    const stones_remaining = if (color == brd.Color.White) board.white_stones_remaining else board.black_stones_remaining;
+    const capstone_remaining = if (color == brd.Color.White) board.white_capstones_remaining else board.black_capstones_remaining;
+    for (0..brd.board_size * brd.board_size) |pos| {
         if (brd.getBit(board.empty_squares, @as(u6, @intCast(pos)))) {
-            if (color == brd.Color.White) {
-                if (board.white_stones_remaining > 0) {
-                    moves.appendUnsafe(brd.Move{
-                        .position = @as(u6, @intCast(pos)),
-                        .pattern = 0,
-                        .flag = @intFromEnum(brd.StoneType.Flat),
-                    });
-                    moves.appendUnsafe(brd.Move{
-                        .position = @as(u6, @intCast(pos)),
-                        .pattern = 0,
-                        .flag = @intFromEnum(brd.StoneType.Standing),
-                    });
-                }
-                if (board.white_capstones_remaining > 0) {
-                    moves.appendUnsafe(brd.Move{
-                        .position = @as(u6, @intCast(pos)),
-                        .pattern = 0,
-                        .flag = @intFromEnum(brd.StoneType.Capstone),
-                    });
-                }
-            } else {
-                if (board.black_stones_remaining > 0) {
-                    moves.appendUnsafe(brd.Move{
-                        .position = @as(u6, @intCast(pos)),
-                        .pattern = 0,
-                        .flag = @intFromEnum(brd.StoneType.Flat),
-                    });
-                    moves.appendUnsafe(brd.Move{
-                        .position = @as(u6, @intCast(pos)),
-                        .pattern = 0,
-                        .flag = @intFromEnum(brd.StoneType.Standing),
-                    });
-                }
-                if (board.black_capstones_remaining > 0) {
-                    moves.appendUnsafe(brd.Move{
-                        .position = @as(u6, @intCast(pos)),
-                        .pattern = 0,
-                        .flag = @intFromEnum(brd.StoneType.Capstone),
-                    });
-                }
+            if (stones_remaining > 0) {
+                moves.appendUnsafe(brd.Move{
+                    .position = @as(u6, @intCast(pos)),
+                    .pattern = 0,
+                    .flag = @intFromEnum(brd.StoneType.Flat),
+                });
+                moves.appendUnsafe(brd.Move{
+                    .position = @as(u6, @intCast(pos)),
+                    .pattern = 0,
+                    .flag = @intFromEnum(brd.StoneType.Standing),
+                });
+            }
+            if (capstone_remaining > 0) {
+                moves.appendUnsafe(brd.Move{
+                    .position = @as(u6, @intCast(pos)),
+                    .pattern = 0,
+                    .flag = @intFromEnum(brd.StoneType.Capstone),
+                });
             }
         }
     }
@@ -543,20 +512,14 @@ fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
         if (!brd.getBit(color_bits, @as(u6, @intCast(pos)))) {
             continue;
         }
-        var can_crush: bool = false;
-        if (board.squares[pos].top()) |top_stone| {
-            if (top_stone.stone_type == brd.StoneType.Capstone) {
-                // std.debug.print("Can crush from position {d}\n", .{pos});
-                can_crush = true;
-            }
-        }
+        const can_crush: bool = (board.capstones & brd.getPositionBB(@as(u6, @intCast(pos))) != 0);
 
         const max_pickup = if (board.squares[pos].len < brd.max_pickup) board.squares[pos].len else brd.max_pickup;
 
         const dirs: [4]brd.Direction = .{ .North, .South, .East, .West };
 
-         for (dirs) |dir| {
-            var max_steps = numSteps(board, @as(u6, @intCast(pos)), dir);
+        inline for (dirs) |dir| {
+            var max_steps = magic.numSteps(board, @as(u6, @intCast(pos)), dir);
             if (max_steps > max_pickup) {
                 max_steps = max_pickup;
             }
@@ -565,18 +528,25 @@ fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
 
             // check if we can crush at the end
             if (can_crush and max_steps < brd.max_pickup) {
-                // std.debug.print("Checking crush move from pos {d} in dir {} with max_steps {d}\n", .{pos, dir, max_steps});
-                if (brd.nthPositionFrom(@as(u6, @intCast(pos)), dir, max_steps + 1)) |end_pos| {
-                    if (board.squares[end_pos].top()) |stone| {
-                        if (stone.stone_type == brd.StoneType.Standing) {
-                            // std.debug.print("Can do crush move from pos {d} to {d} in dir {}\n", .{pos, end_pos, dir});
-                            doing_crush = true;
-                        }
-                    }
-                }
+                const start_bb = brd.getPositionBB(@as(u6, @intCast(pos)));
+                const end_pos_bb = brd.bbGetNthPositionFrom(start_bb, dir, @as(u6, @intCast(max_steps + 1)));
+                doing_crush = (board.standing_stones & end_pos_bb != 0);
             }
 
-            if (max_steps != 0) {
+            if (doing_crush) {
+                const patterns = sym.patterns.combined_patterns[max_pickup - 1][max_steps];
+                if (moves.count + patterns.len > moves.capacity) {
+                    try moves.resize(moves.capacity * 2);
+                }
+                for (0..patterns.len) |pattern| {
+                    moves.appendUnsafe(brd.Move{
+                        .position = @as(u6, @intCast(pos)),
+                        .pattern = patterns.items[pattern],
+                        .flag = @intFromEnum(dir),
+                    });
+                }
+            }
+            else if (max_steps != 0) {
                 const patterns = sym.patterns.patterns[max_pickup - 1][max_steps - 1];
 
                 if (moves.count + patterns.len > moves.capacity) {
@@ -590,42 +560,8 @@ fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
                     });
                 }
             }
-
-            if (doing_crush) {
-                const crush_patterns = sym.patterns.crush_patterns[max_pickup - 1][max_steps];
-                if (moves.count + crush_patterns.len > moves.capacity) {
-                    try moves.resize(moves.capacity * 2);
-                }
-
-                for (0..crush_patterns.len) |pattern| {
-                    moves.appendUnsafe(brd.Move{
-                        .position = @as(u6, @intCast(pos)),
-                        .pattern = crush_patterns.items[pattern],
-                        .flag = @intFromEnum(dir),
-                    });
-                }
-            }
         }
     }
-}
-
-pub fn numSteps(board: *const brd.Board, start: brd.Position, dir: brd.Direction) usize {
-    if (tracy_enable) {
-        const z = tracy.trace(@src());
-        defer z.end();
-    }
-    return magic.numStepsMagic(board, start, dir);
-    // var steps: usize = 0;
-    // var cur_pos = brd.nextPosition(start, dir) orelse return steps;
-    //
-    //  for (0..brd.max_pickup) |_| {
-    //     if ((board.standing_stones | board.capstones) & brd.getPositionBB(cur_pos) != 0) {
-    //         return steps;
-    //     }
-    //     steps += 1;
-    //     cur_pos = brd.nextPosition(cur_pos, dir) orelse return steps;
-    // }
-    // return steps;
 }
 
 pub fn countMoves(board: *const brd.Board) !usize {
@@ -665,47 +601,33 @@ fn countSlideMoves(board: *const brd.Board) !usize {
         if (!brd.getBit(color_bits, @as(u6, @intCast(pos)))) {
             continue;
         }
-        var can_crush: bool = false;
-        if (board.squares[pos].top()) |top_stone| {
-            if (top_stone.stone_type == brd.StoneType.Capstone) {
-                can_crush = true;
-            }
-        }
+        const can_crush: bool = (board.capstones & brd.getPositionBB(@as(u6, @intCast(pos))) != 0);
 
         const max_pickup = if (board.squares[pos].len < brd.max_pickup) board.squares[pos].len else brd.max_pickup;
 
         const dirs: [4]brd.Direction = .{ .North, .South, .East, .West };
 
-         for (dirs) |dir| {
-            var max_steps = numSteps(board, @as(u6, @intCast(pos)), dir);
+        for (dirs) |dir| {
+            var max_steps = magic.numSteps(board, @as(u6, @intCast(pos)), dir);
             if (max_steps > max_pickup) {
                 max_steps = max_pickup;
             }
 
             var doing_crush: bool = false;
-
-            // check if we can crush at the end
             if (can_crush and max_steps < brd.max_pickup) {
-                // std.debug.print("Checking crush move from pos {d} in dir {} with max_steps {d}\n", .{pos, dir, max_steps});
-                if (brd.nthPositionFrom(@as(u6, @intCast(pos)), dir, max_steps + 1)) |end_pos| {
-                    if (board.squares[end_pos].top()) |stone| {
-                        if (stone.stone_type == brd.StoneType.Standing) {
-                            // std.debug.print("Can do crush move from pos {d} to {d} in dir {}\n", .{pos, end_pos, dir});
-                            doing_crush = true;
-                        }
-                    }
-                }
-            }
-
-            if (max_steps != 0) {
-                const patterns = sym.patterns.patterns[max_pickup - 1][max_steps - 1];
-
-                total += patterns.len;
+                const start_bb = brd.getPositionBB(@as(u6, @intCast(pos)));
+                const end_pos_bb = brd.bbGetNthPositionFrom(start_bb, dir, @as(u6, @intCast(max_steps + 1)));
+                doing_crush = (board.standing_stones & end_pos_bb != 0);
             }
 
             if (doing_crush) {
-                const crush_patterns = sym.patterns.crush_patterns[max_pickup - 1][max_steps];
-                total += crush_patterns.len;
+                const patterns = sym.patterns.combined_patterns[max_pickup - 1][max_steps];
+                total += patterns.len;
+            }
+            else if (max_steps != 0) {
+                const patterns = sym.patterns.patterns[max_pickup - 1][max_steps - 1];
+
+                total += patterns.len;
             }
         }
     }

@@ -592,6 +592,20 @@ pub fn nthPositionFrom(pos: Position, dir: Direction, n: usize) ?Position {
     return current_pos;
 }
 
+pub fn bbGetNthPositionFrom(bb: Bitboard, dir: Direction, n: usize) Bitboard {
+    var result: Bitboard = bb;
+
+    for (0..n) |_| {
+        result = switch (dir) {
+            .North => (result << board_size) & board_mask,
+            .South => (result >> board_size) & board_mask,
+            .East => (result << 1) & board_mask & ~column_masks[0],
+            .West => (result >> 1) & board_mask & ~column_masks[board_size - 1],
+        };
+    }
+    return result;
+}
+
 fn hasRoad(player_controlled: Bitboard, search_dir: SearchDirection) bool {
     if (tracy_enable) {
         const z = tracy.trace(@src());

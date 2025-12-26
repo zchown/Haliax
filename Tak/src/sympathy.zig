@@ -18,25 +18,37 @@ pub const PatternList = struct {
         self.items[self.len] = p;
         self.len += 1;
     }
+
+    pub fn combine(self: *PatternList, other: *const PatternList) void {
+        for (0..other.len) |i| {
+            self.add(other.items[i]);
+        }
+    }
 };
 
 pub const Patterns = struct {
     patterns: [brd.max_pickup][brd.max_pickup]PatternList,
     crush_patterns: [brd.max_pickup][brd.max_pickup]PatternList,
+    combined_patterns: [brd.max_pickup][brd.max_pickup]PatternList,
 
     pub fn init() Patterns {
         var ps = [_][brd.max_pickup]PatternList{[_]PatternList{PatternList.init()} ** brd.max_pickup} ** brd.max_pickup;
         var cps = [_][brd.max_pickup]PatternList{[_]PatternList{PatternList.init()} ** brd.max_pickup} ** brd.max_pickup;
+        var cps_combined = [_][brd.max_pickup]PatternList{[_]PatternList{PatternList.init()} ** brd.max_pickup} ** brd.max_pickup;
 
         for (1..brd.max_pickup + 1) |pickup| {
             for (1..brd.max_pickup + 1) |max_length| {
                 generatePatternsForConfig(&ps[pickup - 1][max_length - 1], pickup, max_length);
 
                 generateCrushPatternsForConfig(&cps[pickup - 1][max_length - 1], pickup, max_length);
+                if (max_length > 1) {
+                    cps_combined[pickup - 1][max_length - 1].combine(&ps[pickup - 1][max_length - 2]);
+                }
+                cps_combined[pickup - 1][max_length - 1].combine(&cps[pickup - 1][max_length - 1]);
             }
         }
 
-        return .{ .patterns = ps, .crush_patterns = cps };
+        return .{ .patterns = ps, .crush_patterns = cps , .combined_patterns = cps_combined };
     }
 
     pub fn get(self: *const Patterns, pickup: usize, max_length: usize) []const u8 {
