@@ -405,3 +405,23 @@ test "standing stone slide" {
 
     try moves.checkMove(board, move);
 }
+
+test "lots of standing stones" {
+    const tps_string = "[TPS 2S,2S,2S,2S,2S,2S/1S,1S,1S,1S,1S,1S/2S,2S,2S,2S,2S,2S/1S,1S,1S,1S,1S,1S/2S,2S,2S,2S,2S,2S/11,x5 1 3]";
+
+    var allocator = testing.allocator;
+    var move_list = try moves.MoveList.init(&allocator, 1000);
+    defer move_list.deinit();
+
+    const board = tps.parseTPS(tps_string) catch unreachable;
+
+    try moves.generateMoves(&board, &move_list);
+
+    for (move_list.moves[0..move_list.count]) |move| {
+        const move_string = ptn.moveToString(&allocator, move, board.to_move) catch unreachable;
+        defer testing.allocator.free(move_string);
+        // std.debug.print("Generated move: {s}\n", .{move_string});
+    }
+
+    try testing.expectEqual(@as(usize, 18), move_list.count);
+}

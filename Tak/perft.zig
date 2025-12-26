@@ -64,6 +64,10 @@ fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_li
 
     var nodes: usize = 0;
 
+    if (board.checkResult().ongoing != 1) {
+        return 0;
+    }
+
     var move_list = &move_lists[depth - 1];
     move_list.clear();
 

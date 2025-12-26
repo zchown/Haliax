@@ -241,4 +241,85 @@ test "Is on board" {
     try testing.expect(!brd.isOnBoard(10, 10));
 }
 
+test "full tests" {
+    const tps_str = "[TPS 1,1,1,1,1,1/1,1,1,1,1,1/1,1,1,1,1,1/1,1,1,1,1,1/1,1,1,1,1,1/1,1,1,1,1,1 1 1]";
+    var board = try tps.parseTPS(tps_str);
 
+    const expected = brd.Result{
+        .road = 0,
+        .flat = 1,
+        .color = 0,
+        .ongoing = 0,
+    };
+
+    try testing.expectEqual(expected, board.checkResult());
+}
+
+
+
+test "Check hard roads" {
+    // Test 1: Game should continue (no road yet)
+    const tps_str1 = "[TPS 1,x3,2C,x/1,x2,2,x2/1,1,1,2,2S,x/1,x,1,x3/2,x,1,x3/x,x,2,x3 2 1]";
+    var board1 = try tps.parseTPS(tps_str1);
+    const result1 = board1.checkResult();
+
+    const expected1 = brd.Result{
+        .road = 0,
+        .flat = 0,
+        .color = 0,
+        .ongoing = 1,
+    };
+    try testing.expectEqual(expected1, result1);
+
+    // Test 2: Black road win (vertical column of black stones)
+    const tps_str2 = "[TPS 2,x5/2,x5/2,x5/2,x5/2,x5/2,x5 2 2]";
+    var board2 = try tps.parseTPS(tps_str2);
+    const result2 = board2.checkResult();
+
+    const expected2 = brd.Result{
+        .road = 1,
+        .flat = 0,
+        .color = 1,
+        .ongoing = 0,
+    };
+    try testing.expectEqual(expected2, result2);
+
+    // Test 3: Black road win (complex road pattern)
+    const tps_str3 = "[TPS x6/x6/x6/x,212121,x4/22,12,2,2,2,12/x6 1 31]";
+    var board3 = try tps.parseTPS(tps_str3);
+    const result3 = board3.checkResult();
+
+    const expected3 = brd.Result{
+        .road = 1,
+        .flat = 0,
+        .color = 1,
+        .ongoing = 0,
+    };
+    try testing.expectEqual(expected3, result3);
+
+    // Test 4: Game should continue (single stone in corner, no road)
+    const tps_str4 = "[TPS x6/x6/x6/x6/x6/x5,1 2 2]";
+    var board4 = try tps.parseTPS(tps_str4);
+    const result4 = board4.checkResult();
+
+    const expected4 = brd.Result{
+        .road = 0,
+        .flat = 0,
+        .color = 0,
+        .ongoing = 1,
+    };
+    try testing.expectEqual(expected4, result4);
+
+    // Test 5: White flat win (all standing stones blocking, no roads)
+    const tps_str5 = "[TPS 2S,2S,2S,2S,2S,2S/1S,1S,1S,1S,1S,1S/2S,2S,2S,2S,2S,2S/1S,1S,1S,1S,1S,1S/2S,2S,2S,2S,2S,2S/11,2,1,1,1,1 2 6]";
+    var board5 = try tps.parseTPS(tps_str5);
+    const result5 = board5.checkResult();
+
+    const expected5 = brd.Result{
+        .road = 0,
+        .flat = 1,
+        .color = 0,
+        .ongoing = 0,
+    };
+    try testing.expectEqual(expected5, result5);
+}

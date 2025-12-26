@@ -10,8 +10,9 @@ pub fn main() !void {
 
     // const tps_string = "[TPS 2,2,21S,2,2,2/2,x,222221,2,2,x/1,1,2221C,x,111112C,2S/x,1,2S,x2,121211212/1,1,1212S,1S,2,1S/x2,2,1,21,1 1 42]";
     const tps_string = "[TPS x6/x6/x6/x6/x6/x6 1 1]";
+    // const tps_string = "[TPS 2S,2S,2S,2S,2S,2S/1S,1S,1S,1S,1S,1S/2S,2S,2S,2S,2S,2S/1S,1S,1S,1S,1S,1S/2S,2S,2S,2S,2S,2S/11,x5 1 3]";
 
-    const max_depth: usize = 6;
+    const max_depth: usize = 9;
 
     try perft.runPerft(&allocator, max_depth, tps_string);
 }

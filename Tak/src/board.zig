@@ -418,6 +418,13 @@ pub const Board = struct {
             };
             return;
         }
+
+        self.game_status = Result{
+            .road = 0,
+            .flat = 0,
+            .color = 0,
+            .ongoing = 1,
+        };
     }
 
     pub fn isSquareEmpty(self: *const Board, pos: Position) bool {
