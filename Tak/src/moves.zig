@@ -141,8 +141,12 @@ pub fn checkMove(board: brd.Board, move: brd.Move) MoveError!void {
     var cur_pos = move.position;
     cur_pos = brd.nextPosition(cur_pos, dir) orelse return MoveError.InvalidPattern;
     for (0..length - 1) |_| {
-        if (board.squares[move.position].top()) |stone| {
+        if (board.squares[cur_pos].top()) |stone| {
             if (stone.stone_type == brd.StoneType.Standing) {
+                // std.debug.print("Cannot slide over standing stone at position {d}\n", .{cur_pos});
+                // std.debug.print("Stone type: {}, color: {}\n", .{stone.stone_type, stone.color});
+                // std.debug.print("Move pattern: {b}\n", .{move.pattern});
+                // std.debug.print("Index: {d}\n", .{i});
                 return MoveError.InvalidSlide;
             }
         }

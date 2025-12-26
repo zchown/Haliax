@@ -77,12 +77,13 @@ fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_li
             defer allocator.free(pre_tps);
             // board.recomputeHash();
             const pre_hash = board.zobrist_hash;
+            const pre_tps_str = try tps.boardToTPS(allocator.*, board);
+            defer allocator.free(pre_tps_str);
+
             mvs.makeMoveWithCheck(board, move) catch |err| {
                 const move_ptn = try ptn.moveToString(allocator, move, board.to_move);
                 defer allocator.free(move_ptn);
-                const tps_str = try tps.boardToTPS(allocator.*, board);
-                defer allocator.free(tps_str);
-                std.debug.print("Error making move during perft: Board TPS:\n {s}\n", .{tps_str});
+                std.debug.print("Error making move during perft: Board TPS:\n {s}\n", .{pre_tps_str});
                 std.debug.print("Offending move: {s}\n", .{move_ptn});
                 return err;
             };
