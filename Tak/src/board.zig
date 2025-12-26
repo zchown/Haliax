@@ -166,12 +166,12 @@ pub const Square = struct {
         };
     }
 
-    pub fn top(self: *const Square) ?Piece {
+    pub inline fn top(self: *const Square) ?Piece {
         if (self.len == 0) return null;
         return self.stack[self.len - 1];
     }
 
-    pub fn pushPiece(self: *Square, piece: Piece) void {
+    pub inline fn pushPiece(self: *Square, piece: Piece) void {
         self.stack[self.len] = piece;
         self.len += 1;
         switch (piece.color) {
@@ -180,7 +180,7 @@ pub const Square = struct {
         }
     }
 
-    pub fn removePieces(self: *Square, count: usize) !void {
+    pub inline fn removePieces(self: *Square, count: usize) !void {
         if (count > self.len) {
             return error.StackUnderflow;
         }
@@ -256,7 +256,7 @@ pub const Move = packed struct(u16) {
     }
 
     // position of most significant bit in pattern
-    pub fn movedStones(self: Move) usize {
+    pub inline fn movedStones(self: Move) usize {
         return 8 - @clz(self.pattern);
     }
 };
@@ -477,6 +477,10 @@ pub const Board = struct {
     }
 
     pub fn pushPieceToSquare(self: *Board, pos: Position, piece: Piece) void {
+        // if (tracy_enable) {
+        //     const z = tracy.trace(@src());
+        //     defer z.end();
+        // }
         self.squares[pos].pushPiece(piece);
         // update bitboards
         clearBit(&self.empty_squares, pos);
@@ -497,6 +501,10 @@ pub const Board = struct {
     }
 
     pub fn removePiecesFromSquare(self: *Board, pos: Position, count: usize) !void {
+        // if (tracy_enable) {
+        //     const z = tracy.trace(@src());
+        //     defer z.end();
+        // }
         const square = &self.squares[pos];
 
         clearBit(&self.white_control, pos);
@@ -564,6 +572,10 @@ pub inline fn opositeDirection(dir: Direction) Direction {
 }
 
 pub fn nextPosition(pos: Position, dir: Direction) ?Position {
+    // if (!@inComptime() and tracy_enable) {
+    //     const z = tracy.trace(@src());
+    //     defer z.end();
+    // }
     const x = @as(isize, @intCast(getX(pos)));
     const y = @as(isize, @intCast(getY(pos)));
     const offset = directionOffset(dir);
@@ -581,6 +593,10 @@ pub fn previousPosition(pos: Position, dir: Direction) ?Position {
 }
 
 pub fn nthPositionFrom(pos: Position, dir: Direction, n: usize) ?Position {
+    // if (!@inComptime() and tracy_enable) {
+    //     const z = tracy.trace(@src());
+    //     defer z.end();
+    // }
     var current_pos: Position = pos;
     for (0..n) |_| {
         const next_pos = nextPosition(current_pos, dir);

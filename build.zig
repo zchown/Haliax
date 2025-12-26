@@ -55,6 +55,7 @@ pub fn build(b: *std.Build) void {
     board_module.addImport("tracy", tracy_module);
 
     zobrist_module.addImport("board", board_module);
+    zobrist_module.addImport("tracy", tracy_module);
 
     sympathy_module.addImport("board", board_module);
 
@@ -74,6 +75,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
         }),
+        .use_llvm = true,
     });
 
     exe.root_module.addImport("board", board_module);

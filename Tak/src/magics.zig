@@ -33,10 +33,10 @@ pub fn slideReachable(board: *const brd.Board, pos: brd.Position) brd.Bitboard {
 }
 
 pub fn numSteps(board: *const brd.Board, pos: brd.Position, dir: brd.Direction) usize {
-    if (tracy_enabled) {
-        const z = tracy.trace(@src());
-        defer z.end();
-    }
+    // if (tracy_enabled) {
+    //     const z = tracy.trace(@src());
+    //     defer z.end();
+    // }
     const reachable = slideReachable(board, pos);
     const dir_mask = slide_dir_masks[@as(usize, @intCast(pos))][@intFromEnum(dir)];
     return @as(usize, @intCast(@popCount(reachable & dir_mask)));
