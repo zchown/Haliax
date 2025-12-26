@@ -2,6 +2,7 @@ const std = @import("std");
 const brd = @import("board");
 const sym = @import("sympathy");
 const zob = @import("zobrist");
+const magic = @import("magics.zig");
 
 pub const MoveList = struct {
     moves: []brd.Move,
@@ -46,7 +47,7 @@ pub const MoveList = struct {
         self.count = 0;
     }
 
-    pub inline fn appendUnsafe(self: *MoveList, move: brd.Move) void {
+    pub  fn appendUnsafe(self: *MoveList, move: brd.Move) void {
         self.moves[self.count] = move;
         self.count += 1;
     }
@@ -316,7 +317,7 @@ pub fn checkUndoMove(board: brd.Board, move: brd.Move) MoveError!void {
     var started: bool = false;
     cur_pos= move.position;
 
-    for (0..8) |i| {
+     for (0..8) |i| {
         const bit = (move.pattern >> (7 - @as(u3, @intCast(i)))) & 0x1;
 
         if (!started) {
@@ -413,7 +414,7 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
     var piece_count: usize = 0;
 
     // iterate backwards through pattern
-    for (0..8) |i| {
+     for (0..8) |i| {
 
         if (cur_pos == move.position) {
             break;
@@ -446,7 +447,7 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
 pub fn generateMoves(board: *const brd.Board, moves: *MoveList) !void {
 
     if (board.half_move_count < 2) {
-        for (0..brd.board_size * brd.board_size) |pos| {
+         for (0..brd.board_size * brd.board_size) |pos| {
             if (brd.getBit(board.empty_squares, @as(u6, @intCast(pos)))) {
                 // will always have at least this much capacity to start
                 moves.appendUnsafe(brd.Move{
@@ -465,7 +466,7 @@ pub fn generateMoves(board: *const brd.Board, moves: *MoveList) !void {
 
 fn generatePlaceMoves(board: *const brd.Board, moves: *MoveList) !void {
     const color: brd.Color = board.to_move;
-    for (0..brd.board_size * brd.board_size) |pos| {
+     for (0..brd.board_size * brd.board_size) |pos| {
         if (brd.getBit(board.empty_squares, @as(u6, @intCast(pos)))) {
             if (color == brd.Color.White) {
                 if (board.white_stones_remaining > 0) {
@@ -532,7 +533,7 @@ fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
 
         const dirs: [4]brd.Direction = .{ .North, .South, .East, .West };
 
-        for (dirs) |dir| {
+         for (dirs) |dir| {
             var max_steps = numSteps(board, @as(u6, @intCast(pos)), dir);
             if (max_steps > max_pickup) {
                 max_steps = max_pickup;
@@ -587,10 +588,11 @@ fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
 }
 
 pub fn numSteps(board: *const brd.Board, start: brd.Position, dir: brd.Direction) usize {
+    // return magic.numStepsMagic(board, start, dir);
     var steps: usize = 0;
     var cur_pos = brd.nextPosition(start, dir) orelse return steps;
-
-    for (0..brd.max_pickup) |_| {
+    
+     for (0..brd.max_pickup) |_| {
         if ((board.standing_stones | board.capstones) & brd.getPositionBB(cur_pos) != 0) {
             return steps;
         }
@@ -648,7 +650,7 @@ fn countSlideMoves(board: *const brd.Board) !usize {
 
         const dirs: [4]brd.Direction = .{ .North, .South, .East, .West };
 
-        for (dirs) |dir| {
+         for (dirs) |dir| {
             var max_steps = numSteps(board, @as(u6, @intCast(pos)), dir);
             if (max_steps > max_pickup) {
                 max_steps = max_pickup;

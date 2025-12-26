@@ -61,12 +61,13 @@ pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []c
 
 fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_lists: []mvs.MoveList) !usize {
 
-    if (mode == .Debug or mode == .ReleaseSafe) {
-        if (depth == 0) return 1;
-    }
-    else {
-        if (depth == 1) return mvs.countMoves(board);
-    }
+    // if (mode == .Debug or mode == .ReleaseSafe) {
+    //     if (depth == 0) return 1;
+    // }
+    // else {
+    //     if (depth == 1) return mvs.countMoves(board);
+    // }
+    if (depth == 0) return 1;
 
     var nodes: usize = 0;
 
