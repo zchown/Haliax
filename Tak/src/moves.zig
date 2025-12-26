@@ -610,18 +610,22 @@ fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
 }
 
 pub fn numSteps(board: *const brd.Board, start: brd.Position, dir: brd.Direction) usize {
-    // return magic.numStepsMagic(board, start, dir);
-    var steps: usize = 0;
-    var cur_pos = brd.nextPosition(start, dir) orelse return steps;
-    
-     for (0..brd.max_pickup) |_| {
-        if ((board.standing_stones | board.capstones) & brd.getPositionBB(cur_pos) != 0) {
-            return steps;
-        }
-        steps += 1;
-        cur_pos = brd.nextPosition(cur_pos, dir) orelse return steps;
+    if (tracy_enable) {
+        const z = tracy.trace(@src());
+        defer z.end();
     }
-    return steps;
+    return magic.numStepsMagic(board, start, dir);
+    // var steps: usize = 0;
+    // var cur_pos = brd.nextPosition(start, dir) orelse return steps;
+    //
+    //  for (0..brd.max_pickup) |_| {
+    //     if ((board.standing_stones | board.capstones) & brd.getPositionBB(cur_pos) != 0) {
+    //         return steps;
+    //     }
+    //     steps += 1;
+    //     cur_pos = brd.nextPosition(cur_pos, dir) orelse return steps;
+    // }
+    // return steps;
 }
 
 pub fn countMoves(board: *const brd.Board) !usize {

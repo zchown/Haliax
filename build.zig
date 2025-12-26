@@ -86,6 +86,22 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
 
+    const gen = b.addExecutable(.{
+        .name = "magics",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("Tak/tools/gen_magic.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    gen.root_module.addImport("board", board_module);
+    b.installArtifact(gen);
+    const magics_step = b.step("magics", "Build the magic-table generator");
+    magics_step.dependOn(&gen.step);
+    const run_gen = b.addRunArtifact(gen);
+    const gen_step = b.step("gen-magics", "Run generator and print Zig tables to stdout");
+    gen_step.dependOn(&run_gen.step);
+
     const exe_options = b.addOptions();
     exe.root_module.addOptions("build_options", exe_options);
     tracy_module.addOptions("build_options", exe_options);
@@ -167,6 +183,7 @@ pub fn build(b: *std.Build) void {
         const test_desc = b.fmt("Run {s} tests", .{test_info.name});
         const individual_test_step = b.step(test_name, test_desc);
         individual_test_step.dependOn(&run_test.step);
+
     }
 }
 

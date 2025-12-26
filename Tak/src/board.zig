@@ -393,6 +393,10 @@ pub const Board = struct {
     }
 
     fn checkRoadWin(self: *Board) void {
+        if (tracy_enable) {
+            const z = tracy.trace(@src());
+            defer z.end();
+        }
         const current: Color = self.to_move.opposite();
         const opponent: Color = self.to_move;
 
@@ -589,6 +593,10 @@ pub fn nthPositionFrom(pos: Position, dir: Direction, n: usize) ?Position {
 }
 
 fn hasRoad(player_controlled: Bitboard, search_dir: SearchDirection) bool {
+    if (tracy_enable) {
+        const z = tracy.trace(@src());
+        defer z.end();
+    }
     const start_mask: Bitboard = if (search_dir == .Vertical) row_masks[board_size - 1] else column_masks[0];
     const end_mask: Bitboard = if (search_dir == .Vertical) row_masks[0] else column_masks[board_size - 1];
 
