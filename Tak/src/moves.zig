@@ -139,7 +139,8 @@ pub fn checkMove(board: brd.Board, move: brd.Move) MoveError!void {
     }
 
     var cur_pos = move.position;
-    for (0..length) |_| {
+    cur_pos = brd.nextPosition(cur_pos, dir) orelse return MoveError.InvalidPattern;
+    for (0..length - 1) |_| {
         if (board.squares[move.position].top()) |stone| {
             if (stone.stone_type == brd.StoneType.Standing) {
                 return MoveError.InvalidSlide;
@@ -293,18 +294,23 @@ pub fn checkUndoMove(board: brd.Board, move: brd.Move) MoveError!void {
     const dir: brd.Direction = @enumFromInt(move.flag);
     const length: usize = @popCount(move.pattern);
     const end_pos = brd.nthPositionFrom(move.position, dir, length) orelse return MoveError.InvalidPattern;
-
-    if (board.squares[end_pos].top()) |stone| {
-        if (stone.stone_type == brd.StoneType.Standing) {
-            return MoveError.InvalidMove;
+    
+    var cur_pos = move.position;
+    while (cur_pos != end_pos) {
+        if (board.squares[cur_pos].top()) |stone| {
+            if (stone.stone_type == brd.StoneType.Standing) {
+                return MoveError.InvalidSlide;
+            }
         }
+        cur_pos = brd.nextPosition(cur_pos, dir) orelse return MoveError.InvalidPattern;
     }
+
 
     // Reconstruct the list of destination positions used during the original slide.
     var positions: [8]brd.Position = undefined;
     var idx: usize = 0;
     var started: bool = false;
-    var cur_pos: brd.Position = move.position;
+    cur_pos= move.position;
 
     for (0..8) |i| {
         const bit = (move.pattern >> (7 - @as(u3, @intCast(i)))) & 0x1;
@@ -430,206 +436,6 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
         board.squares[end_pos].stack[board.squares[end_pos].len - 1].?.stone_type = brd.StoneType.Standing;
     }
 
-    zob.updateZobristHash(board, move);
-}
-
-pub fn undoMove3(board: *brd.Board, move: brd.Move) void {
-
-    defer {
-        board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
-        board.half_move_count -= 1;
-    }
-
-    if (move.pattern == 0) {
-        zob.updateZobristHash(board, move);
-        board.to_move = board.to_move.opposite();
-        const top_stone = board.squares[move.position].top() orelse unreachable;
-        const color = top_stone.color;
-
-        const popped: brd.Piece = top_stone;
-        board.removePiecesFromSquare(move.position, 1) catch unreachable;
-
-        switch (popped.stone_type) {
-            .Flat => {
-                if (color == brd.Color.White) {
-                    board.white_stones_remaining += 1;
-                } else {
-                    board.black_stones_remaining += 1;
-                }
-            },
-            .Standing => {
-                brd.clearBit(&board.standing_stones, move.position);
-                if (color == brd.Color.White) {
-                    board.white_stones_remaining += 1;
-                } else {
-                    board.black_stones_remaining += 1;
-                }
-            },
-            .Capstone => {
-                brd.clearBit(&board.capstones, move.position);
-                if (color == brd.Color.White) {
-                    board.white_capstones_remaining += 1;
-                } else {
-                    board.black_capstones_remaining += 1;
-                }
-            },
-        }
-
-        return;
-    }
-
-
-    // slide move
-    board.to_move = board.to_move.opposite();
-    const dir: brd.Direction = @enumFromInt(move.flag);
-
-    var started: bool = false;
-    var cur_pos: brd.Position = move.position;
-
-    var piece_buffer: [8]brd.Piece = undefined;
-    var piece_count: usize = 0;
-
-    for (0..8) |i| {
-        const bit = (move.pattern >> (7 - @as(u3, @intCast(i)))) & 0x1;
-
-        if (!started) {
-            if (bit == 1) {
-                started = true;
-            } else {
-                continue;
-            }
-        }
-
-        if (bit == 1) {
-            for (0..piece_count) |j| {
-                std.debug.print("Pushing piece back to start pos\n", .{});
-                std.debug.print("Piece type: {d}, color: {d}\n", .{@intFromEnum(piece_buffer[piece_count - 1 - j].stone_type), @intFromEnum(piece_buffer[piece_count - 1 - j].color)});
-
-                board.pushPieceToSquare(cur_pos, piece_buffer[piece_count - 1 - j]);
-            }
-            piece_count = 0;
-            cur_pos = brd.nextPosition(cur_pos, dir) orelse unreachable;
-        }
-
-        const top_piece: brd.Piece = board.squares[cur_pos].stack[board.squares[cur_pos].len - 1] orelse unreachable;
-        board.removePiecesFromSquare(cur_pos, 1) catch unreachable;
-        piece_buffer[piece_count] = top_piece;
-        piece_count += 1;
-    }
-    for (0..piece_count) |j| {
-        const idx =  j;
-        if (move.pattern == 3) {
-            std.debug.print("Pushing piece back to start pos\n", .{});
-            std.debug.print("Piece type: {d}, color: {d}\n", .{@intFromEnum(piece_buffer[idx].stone_type), @intFromEnum(piece_buffer[idx].color)});
-        }
-        board.pushPieceToSquare(move.position, piece_buffer[idx]);
-    }
-
-    zob.updateZobristHash(board, move);
-}
-pub fn undoMove2(board: *brd.Board, move: brd.Move) void {
-
-    defer {
-        board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
-        board.half_move_count -= 1;
-    }
-
-    if (move.pattern == 0) {
-        zob.updateZobristHash(board, move);
-        board.to_move = board.to_move.opposite();
-        const top_stone = board.squares[move.position].top() orelse unreachable;
-        const color = top_stone.color;
-
-        const popped: brd.Piece = top_stone;
-        board.removePiecesFromSquare(move.position, 1) catch unreachable;
-
-        switch (popped.stone_type) {
-            .Flat => {
-                if (color == brd.Color.White) {
-                    board.white_stones_remaining += 1;
-                } else {
-                    board.black_stones_remaining += 1;
-                }
-            },
-            .Standing => {
-                brd.clearBit(&board.standing_stones, move.position);
-                if (color == brd.Color.White) {
-                    board.white_stones_remaining += 1;
-                } else {
-                    board.black_stones_remaining += 1;
-                }
-            },
-            .Capstone => {
-                brd.clearBit(&board.capstones, move.position);
-                if (color == brd.Color.White) {
-                    board.white_capstones_remaining += 1;
-                } else {
-                    board.black_capstones_remaining += 1;
-                }
-            },
-        }
-
-        return;
-    }
-
-
-    // slide move
-    board.to_move = board.to_move.opposite();
-    const dir: brd.Direction = @enumFromInt(move.flag);
-    const length: usize = @popCount(move.pattern);
-    const end_pos = brd.nthPositionFrom(move.position, dir, length) orelse unreachable;
-
-    var positions: [8]brd.Position = undefined;
-    var idx: usize = 0;
-    var started: bool = false;
-    var cur_pos: brd.Position = move.position;
-
-    for (0..8) |i| {
-        const bit = (move.pattern >> (7 - @as(u3, @intCast(i)))) & 0x1;
-
-        if (!started) {
-            if (bit == 1) {
-                started = true;
-            } else {
-                continue;
-            }
-        }
-
-        if (bit == 1) {
-            cur_pos = brd.nextPosition(cur_pos, dir) orelse unreachable;
-        }
-
-        positions[idx] = cur_pos;
-        idx += 1;
-
-        if (idx == length) break;
-    }
-
-    var popped: [8]brd.Piece = undefined;
-    var pidx: usize = 0;
-
-    var j: isize = @as(isize, @intCast(idx)) - 1;
-    while (j >= 0) : (j -= 1) {
-        const pos = positions[@intCast(j)];
-
-        const top_piece: brd.Piece = board.squares[pos].stack[board.squares[pos].len - 1] orelse unreachable;
-        // board.squares[pos].remove(1) catch unreachable;
-        board.removePiecesFromSquare(pos, 1) catch unreachable;
-        popped[pidx] = top_piece;
-        pidx += 1;
-    }
-
-    if (board.crushMoves[board.half_move_count % brd.crush_map_size] == .Crush) {
-        if (board.squares[end_pos].top()) |_| {
-            board.squares[end_pos].stack[board.squares[end_pos].len - 1].?.stone_type = brd.StoneType.Standing;
-        }
-    }
-
-    var k: isize = @as(isize, @intCast(pidx)) - 1;
-    while (k >= 0) : (k -= 1) {
-        // board.squares[move.position].push(popped[@intCast(k)]);
-        board.pushPieceToSquare(move.position, popped[@intCast(k)]);
-    }
     zob.updateZobristHash(board, move);
 }
 
@@ -774,23 +580,16 @@ fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
     }
 }
 
-fn numSteps(board: *const brd.Board, start: brd.Position, dir: brd.Direction) usize {
+pub fn numSteps(board: *const brd.Board, start: brd.Position, dir: brd.Direction) usize {
     var steps: usize = 0;
     var cur_pos = brd.nextPosition(start, dir) orelse return steps;
-    var pos_bit: brd.Bitboard = brd.getPositionBB(cur_pos);
 
     for (0..brd.max_pickup) |_| {
-        if ((board.standing_stones | board.capstones) & pos_bit != 0) {
+        if ((board.standing_stones | board.capstones) & brd.getPositionBB(cur_pos) != 0) {
             return steps;
         }
         steps += 1;
         cur_pos = brd.nextPosition(cur_pos, dir) orelse return steps;
-        switch (dir) {
-            .North => pos_bit <<= brd.board_size,
-            .South => pos_bit >>= brd.board_size,
-            .East => pos_bit <<= 1,
-            .West => pos_bit >>= 1,
-        }
     }
     return steps;
 }

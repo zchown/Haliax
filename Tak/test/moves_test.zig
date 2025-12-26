@@ -2,6 +2,7 @@ const std = @import("std");
 const brd = @import("board");
 const moves = @import("moves");
 const tps = @import("tps");
+const ptn = @import("ptn");
 const testing = std.testing;
 
 test "MoveList initialization" {
@@ -373,3 +374,18 @@ test "slide move with multiple drops and undo" {
     try testing.expectEqual(brd.Color.Black, board.squares[brd.getPos(0, 0)].stack[1].?.color);
     try testing.expectEqual(brd.Color.White, board.squares[brd.getPos(0, 0)].stack[2].?.color);
 }
+
+// test "standing blocker" {
+//     const board = tps.parseTPS("[TPS 2,2,21S,2,2,2/2,x,222221,2,2,x/1,1,2221C,x,111112C,2S/x,1,2S,x2,121211212/1,1,1212S,1S,2,1S/x2,2,1,21,1 1 42]") catch unreachable;
+//     var allocator = testing.allocator;
+//     var move_list = try moves.MoveList.init(&allocator, 500);
+//     defer move_list.deinit();
+//
+//     const move = brd.Move.createSlideMove(brd.getPos(3, 1), .North, 0b00000001);
+//     const move_string = ptn.moveToString(&allocator, move, brd.Color.White) catch unreachable;
+//     defer testing.allocator.free(move_string);
+//     std.debug.print("Testing move: {s}\n", .{move_string});
+//
+//     const steps = moves.numSteps(&board, brd.getPos(3, 1), .North);
+//     try testing.expectEqual(@as(usize, 0), steps);
+// }
