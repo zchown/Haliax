@@ -31,6 +31,10 @@ pub const MoveList = struct {
     }
 
     pub fn resize(self: *MoveList, new_capacity: usize) !void {
+        if (tracy_enable) {
+            const z = tracy.trace(@src());
+            defer z.end();
+        }
         const new_moves = try self.allocator.alloc(brd.Move, new_capacity);
         std.mem.copyForwards(brd.Move, new_moves[0..self.count], self.moves[0..self.count]);
         self.allocator.free(self.moves);
@@ -39,6 +43,10 @@ pub const MoveList = struct {
     }
 
     pub fn append(self: *MoveList, move: brd.Move) !void {
+        if (tracy_enable) {
+            const z = tracy.trace(@src());
+            defer z.end();
+        }
         if (self.count >= self.capacity) {
             try self.resize(self.capacity * 2);
         }
@@ -46,14 +54,38 @@ pub const MoveList = struct {
         self.count += 1;
     }
 
-    pub fn clear(self: *MoveList) void {
+    pub inline fn clear(self: *MoveList) void {
         self.count = 0;
     }
 
-    pub  fn appendUnsafe(self: *MoveList, move: brd.Move) void {
+    pub inline fn appendUnsafe(self: *MoveList, move: brd.Move) void {
         self.moves[self.count] = move;
         self.count += 1;
     }
+
+    pub inline fn ensureUnusedCapacity(self: *MoveList, additional: usize) !void {
+        const needed = self.count + additional;
+        if (needed <= self.capacity) return;
+
+        var new_cap = self.capacity;
+        if (new_cap == 0) new_cap = 1;
+
+        while (needed > new_cap) new_cap *= 2;
+        try self.resize(new_cap);
+    }
+
+    pub inline fn addManyAsSlice(self: *MoveList, n: usize) ![]brd.Move {
+        try self.ensureUnusedCapacity(n);
+        const start = self.count;
+        self.count += n;
+        return self.moves[start .. start + n];
+    }
+
+    pub inline fn appendSlice(self: *MoveList, src: []const brd.Move) !void {
+        const dst = try self.addManyAsSlice(src.len);
+        @memcpy(dst, src);
+    }
+
 };
 
 pub const MoveError = error{
@@ -535,29 +567,24 @@ fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
 
             if (doing_crush) {
                 const patterns = sym.patterns.combined_patterns[max_pickup - 1][max_steps];
-                if (moves.count + patterns.len > moves.capacity) {
-                    try moves.resize(moves.capacity * 2);
-                }
+                const out = try moves.addManyAsSlice(patterns.len);
                 for (0..patterns.len) |pattern| {
-                    moves.appendUnsafe(brd.Move{
+                    out[pattern] = brd.Move{
                         .position = @as(u6, @intCast(pos)),
                         .pattern = patterns.items[pattern],
                         .flag = @intFromEnum(dir),
-                    });
+                    };
                 }
             }
             else if (max_steps != 0) {
                 const patterns = sym.patterns.patterns[max_pickup - 1][max_steps - 1];
-
-                if (moves.count + patterns.len > moves.capacity) {
-                    try moves.resize(moves.capacity * 2);
-                }
+                const out = try moves.addManyAsSlice(patterns.len);
                 for (0..patterns.len) |pattern| {
-                    moves.appendUnsafe(brd.Move{
+                    out[pattern] = brd.Move{
                         .position = @as(u6, @intCast(pos)),
                         .pattern = patterns.items[pattern],
                         .flag = @intFromEnum(dir),
-                    });
+                    };
                 }
             }
         }
@@ -607,7 +634,7 @@ fn countSlideMoves(board: *const brd.Board) !usize {
 
         const dirs: [4]brd.Direction = .{ .North, .South, .East, .West };
 
-        for (dirs) |dir| {
+        inline for (dirs) |dir| {
             var max_steps = magic.numSteps(board, @as(u6, @intCast(pos)), dir);
             if (max_steps > max_pickup) {
                 max_steps = max_pickup;
