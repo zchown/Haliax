@@ -1,6 +1,7 @@
 const std = @import("std");
 const brd = @import("board");
 const moves = @import("moves");
+const tps = @import("tps");
 const testing = std.testing;
 
 test "MoveList initialization" {
@@ -139,7 +140,7 @@ test "makeMove - first two moves swap colors" {
 
 test "makeMove - simple slide" {
     var board = brd.Board.init();
-    board.half_move_count = 2; 
+    board.half_move_count = 2;
 
     board.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
         .stone_type = .Flat,
@@ -328,4 +329,47 @@ test "slide move with multiple drops" {
     try testing.expectEqual(@as(usize, 1), board.squares[brd.getPos(0, 0)].len);
     try testing.expectEqual(@as(usize, 1), board.squares[brd.getPos(0, 1)].len);
     try testing.expectEqual(@as(usize, 1), board.squares[brd.getPos(0, 2)].len);
+}
+
+test "slide move with multiple drops and undo" {
+    var board = brd.Board.init();
+    board.half_move_count = 2;
+
+    for (0..3) |i| {
+        board.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
+            .stone_type = .Flat,
+            .color = @as(brd.Color, @enumFromInt(i % 2)),
+        });
+    }
+    brd.setBit(&board.white_control, brd.getPos(0, 0));
+
+    const tps_str_before = try tps.boardToTPS(testing.allocator, &board);
+    defer testing.allocator.free(tps_str_before);
+    // std.debug.print(" tps \n", .{});
+    // std.debug.print("TPS before move: {s}\n", .{tps_str_before});
+
+    const move = brd.Move.createSlideMove(brd.getPos(0, 0), .North, 0b00000011);
+    moves.makeMove(&board, move);
+
+    const tps_str_after = try tps.boardToTPS(testing.allocator, &board);
+    defer testing.allocator.free(tps_str_after);
+    // std.debug.print("TPS after move: {s}\n", .{tps_str_after});
+
+    try testing.expectEqual(@as(usize, 1), board.squares[brd.getPos(0, 0)].len);
+    try testing.expectEqual(@as(usize, 1), board.squares[brd.getPos(0, 1)].len);
+    try testing.expectEqual(brd.Color.White, board.squares[brd.getPos(0, 2)].top().?.color);
+    try testing.expectEqual(@as(usize, 1), board.squares[brd.getPos(0, 2)].len);
+    try testing.expectEqual(brd.Color.Black, board.squares[brd.getPos(0, 1)].top().?.color);
+
+    moves.undoMove(&board, move);
+
+    // print tps
+    const tps_str = try tps.boardToTPS(testing.allocator, &board);
+    defer testing.allocator.free(tps_str);
+    // std.debug.print("TPS after undo: {s}\n", .{tps_str});
+
+    try testing.expectEqual(@as(usize, 3), board.squares[brd.getPos(0, 0)].len);
+    try testing.expectEqual(brd.Color.White, board.squares[brd.getPos(0, 0)].stack[0].?.color);
+    try testing.expectEqual(brd.Color.Black, board.squares[brd.getPos(0, 0)].stack[1].?.color);
+    try testing.expectEqual(brd.Color.White, board.squares[brd.getPos(0, 0)].stack[2].?.color);
 }

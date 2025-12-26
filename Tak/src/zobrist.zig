@@ -36,7 +36,8 @@ pub fn computeZobristHash(board: *brd.Board) void {
 
     for (0..brd.num_squares) |sq| {
         const square = board.squares[sq];
-        const start: usize = if (@as(isize, @intCast(square.len)) - 7 > 0) square.len - 7 else 0;
+        const start: usize = if (@as(isize, @intCast(square.len)) - brd.zobrist_stack_depth < 0) 0 else square.len - brd.zobrist_stack_depth;
+        var j: usize = 0;
         for (start..square.len) |i| {
             const piece = square.stack[i].?;
             const piece_type: usize = switch (piece.stone_type) {
@@ -48,7 +49,8 @@ pub fn computeZobristHash(board: *brd.Board) void {
                 .White => 0,
                 .Black => 1,
             };
-            hash ^= zobrist_table[sq][color][piece_type][i];
+            hash ^= zobrist_table[sq][color][piece_type][j];
+            j += 1;
         }
     }
 

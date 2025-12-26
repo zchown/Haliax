@@ -60,6 +60,7 @@ pub fn parseTPS(tps: []const u8) !Board {
     }
 
     try updateBoardState(&b);
+    b.recomputeHash();
 
     return b;
 }

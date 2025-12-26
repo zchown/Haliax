@@ -234,22 +234,21 @@ pub const Move = packed struct(u16) {
     }
 
     pub fn print(self: Move) void {
-        const stdout = std.io.getStdOut().writer();
         if (self.pattern == 0) {
-            const stone_type = switch (@as(StoneType, self.flag)) {
+            const stone_type = switch (@as(StoneType, @enumFromInt(self.flag))) {
                 .Flat => "Flat",
                 .Standing => "Standing",
                 .Capstone => "Capstone",
             };
-            _ = stdout.print("Place {s} at ({d}, {d})\n", .{ stone_type, getX(self.position), getY(self.position) });
+            std.debug.print("Place {s} at ({d}, {d})\n", .{ stone_type, getX(self.position), getY(self.position) });
         } else {
-            const direction = switch (@as(Direction, self.flag)) {
+            const direction = switch (@as(Direction, @enumFromInt(self.flag))) {
                 .North => "North",
                 .South => "South",
                 .East => "East",
                 .West => "West",
             };
-            _ = stdout.print("Slide from ({d}, {d}) to {s} with pattern {b}\n", .{ getX(self.position), getY(self.position), direction, self.pattern });
+            std.debug.print("Slide from ({d}, {d}) to {s} with pattern {b}\n", .{ getX(self.position), getY(self.position), direction, self.pattern });
         }
     }
 
@@ -425,6 +424,10 @@ pub const Board = struct {
         return self.squares[pos].len == 0;
     }
 
+    pub fn recomputeHash(self: *Board) void {
+        zob.computeZobristHash(self);
+    }
+
     pub fn recomputeBitboards(self: *Board) void {
         self.white_control = 0;
         self.black_control = 0;
@@ -553,6 +556,10 @@ pub fn nextPosition(pos: Position, dir: Direction) ?Position {
     } else {
         return null;
     }
+}
+
+pub fn previousPosition(pos: Position, dir: Direction) ?Position {
+    return nextPosition(pos, opositeDirection(dir));
 }
 
 pub fn nthPositionFrom(pos: Position, dir: Direction, n: usize) ?Position {
