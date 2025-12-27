@@ -2,7 +2,7 @@ const std = @import("std");
 const brd = @import("board");
 const sym = @import("sympathy");
 const zob = @import("zobrist");
-const magic = @import("magics.zig");
+const magic = @import("magics");
 const tracy = @import("tracy");
 
 const tracy_enable = tracy.build_options.enable_tracy;
@@ -271,6 +271,8 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
     var cur_pos: brd.Position = move.position;
     var stones_moved: usize = 0;
     const count = move.movedStones();
+    var prev_top: ?brd.Piece = board.squares[move.position].top();
+
     for (0..8) |i| {
         const bit = (move.pattern >> (7 - @as(u3, @intCast(i)))) & 0x1;
         if (!started) {
@@ -281,14 +283,17 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
             }
         }
         if (bit == 1) {
+            board.onTopPieceChanged(cur_pos, board.squares[cur_pos].top(), prev_top);
             cur_pos = brd.nextPosition(cur_pos, dir) orelse unreachable;
+            prev_top = board.squares[cur_pos].top();
         }
         const stack_index = board.squares[move.position].len - count + stones_moved;
         const to_move: brd.Piece = board.squares[move.position].stack[stack_index].?;
         // board.squares[cur_pos].push(to_move);
-        board.pushPieceToSquare(cur_pos, to_move);
+        board.pushPieceToSquareNoUpdate(cur_pos, to_move);
         stones_moved += 1;
     }
+    board.onTopPieceChanged(cur_pos, board.squares[cur_pos].top(), prev_top);
 
     // board.squares[move.position].remove(move.movedStones()) catch unreachable;
     board.removePiecesFromSquare(move.position, stones_moved) catch unreachable;
@@ -464,9 +469,11 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
         }
     }
 
+    const prev_top = board.squares[move.position].top();
     for (0..piece_count) |j| {
-        board.pushPieceToSquare(move.position, piece_buffer[piece_count - 1 - j]);
+        board.pushPieceToSquareNoUpdate(move.position, piece_buffer[piece_count - 1 - j]);
     }
+    board.onTopPieceChanged(move.position, prev_top, board.squares[move.position].top());
 
     if (board.crushMoves[board.half_move_count - 1 % brd.crush_map_size] == .Crush) {
         board.squares[end_pos].stack[board.squares[end_pos].len - 1].?.stone_type = brd.StoneType.Standing;
@@ -483,7 +490,7 @@ pub fn generateMoves(board: *const brd.Board, moves: *MoveList) !void {
     }
     if (board.half_move_count < 2) {
         for (0..brd.board_size * brd.board_size) |pos| {
-            if (brd.getBit(board.empty_squares, @as(u6, @intCast(pos)))) {
+            if (board.isSquareEmpty(@as(brd.Position, @intCast(pos)))) {
                 // will always have at least this much capacity to start
                 moves.appendUnsafe(brd.Move{
                     .position = @as(u6, @intCast(pos)),
@@ -508,7 +515,7 @@ fn generatePlaceMoves(board: *const brd.Board, moves: *MoveList) !void {
     const stones_remaining = if (color == brd.Color.White) board.white_stones_remaining else board.black_stones_remaining;
     const capstone_remaining = if (color == brd.Color.White) board.white_capstones_remaining else board.black_capstones_remaining;
     for (0..brd.board_size * brd.board_size) |pos| {
-        if (brd.getBit(board.empty_squares, @as(u6, @intCast(pos)))) {
+        if (board.isSquareEmpty(@as(brd.Position, @intCast(pos)))) {
             if (stones_remaining > 0) {
                 moves.appendUnsafe(brd.Move{
                     .position = @as(u6, @intCast(pos)),

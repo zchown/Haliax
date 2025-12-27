@@ -48,6 +48,7 @@ pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []c
             .{ depth, nodes, depth_ms, mnps },
         );
 
+
         total_nodes += nodes;
     }
 
@@ -57,6 +58,7 @@ pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []c
     std.debug.print("\nTotal nodes: {d}\n", .{total_nodes});
     std.debug.print("Total time: {d}ms\n", .{total_ns / std.time.ns_per_ms});
     std.debug.print("Average speed: {d:.2} MNPS\n", .{avg_mnps});
+    std.debug.print("==============================\n\n\n\n", .{});
 }
 
 fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_lists: []mvs.MoveList) !usize {

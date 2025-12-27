@@ -1,7 +1,7 @@
 const std = @import("std");
 const zob = @import("zobrist");
+const road = @import("road");
 const tracy = @import("tracy");
-// const build_options = @import("build_options");
 const tracy_enable = tracy.build_options.enable_tracy;
 
 pub const board_size = 6;
@@ -17,6 +17,10 @@ pub const num_colors = 2;
 pub const zobrist_stack_depth = board_size + 1;
 pub const num_directions = 4;
 pub const crush_map_size = 256;
+
+// whether to use union-find for road detection
+// alternative is flood fill bitboard method
+const do_road_uf = false;
 
 pub const StoneType = enum(u2) {
     Flat,
@@ -274,25 +278,32 @@ const SearchDirection = enum {
 
 pub const Board = struct {
     squares: [num_squares]Square,
-    white_stones_remaining: usize = stone_count,
-    black_stones_remaining: usize = stone_count,
-    white_capstones_remaining: usize = capstone_count,
-    black_capstones_remaining: usize = capstone_count,
-    zobrist_hash: zob.ZobristHash = 0,
-    to_move: Color = .White,
-    half_move_count: usize = 0,
-    white_control: Bitboard = 0,
-    black_control: Bitboard = 0,
-    empty_squares: Bitboard = 0,
-    standing_stones: Bitboard = 0,
-    capstones: Bitboard = 0,
-    crushMoves: [crush_map_size]Crush = undefined,
-    game_status: Result = Result{
-        .road = 0,
-        .flat = 0,
-        .color = 0,
-        .ongoing = 1,
-    },
+
+    white_stones_remaining: usize,
+    black_stones_remaining: usize,
+
+    white_capstones_remaining: usize,
+    black_capstones_remaining: usize,
+
+    zobrist_hash: zob.ZobristHash,
+
+    to_move: Color,
+    half_move_count: usize,
+
+    white_control: Bitboard,
+    black_control: Bitboard,
+    empty_squares: Bitboard,
+    standing_stones: Bitboard,
+    capstones: Bitboard,
+
+    crushMoves: [crush_map_size]Crush,
+
+    game_status: Result,
+
+    white_road_dsf: road.RoadDSF,
+    black_road_dsf: road.RoadDSF,
+    road_dirty_white: bool,
+    road_dirty_black: bool,
 
     pub fn init() Board {
         var brd = Board{
@@ -316,6 +327,10 @@ pub const Board = struct {
                 .color = 0,
                 .ongoing = 1,
             },
+            .white_road_dsf = road.RoadDSF.init(),
+            .black_road_dsf = road.RoadDSF.init(),
+            .road_dirty_white = false,
+            .road_dirty_black = false,
         };
 
         zob.computeZobristHash(&brd);
@@ -342,7 +357,10 @@ pub const Board = struct {
             .color = 0,
             .ongoing = 1,
         };
-        try self.gameHistory.clear();
+        self.white_road_dsf.clear();
+        self.black_road_dsf.clear();
+        self.road_dirty_white = false;
+        self.road_dirty_black = false;
         zob.computeZobristHash(self);
     }
 
@@ -388,8 +406,43 @@ pub const Board = struct {
                 };
             }
         } else {
-            self.checkRoadWin();
+            if (do_road_uf) {
+                self.checkRoadWinUF();
+            } else {
+                self.checkRoadWin();
+            }
         }
+    }
+
+    fn checkRoadWinUF(self: *Board) void {
+        if (tracy_enable) {
+            const z = tracy.trace(@src());
+            defer z.end();
+        }
+        const current: Color = self.to_move.opposite();
+        const opponent: Color = self.to_move;
+
+        if (self.hasRoadUF(current)) {
+            self.game_status = Result{
+                .road = 1,
+                .flat = 0,
+                .color = if (current == .White) 0 else 1,
+                .ongoing = 0,
+            };
+            return;
+        }
+
+        if (self.hasRoadUF(opponent)) {
+            self.game_status = Result{
+                .road = 1,
+                .flat = 0,
+                .color = if (opponent == .White) 0 else 1,
+                .ongoing = 0,
+            };
+            return;
+        }
+
+        self.game_status = Result{ .road = 0, .flat = 0, .color = 0, .ongoing = 1 };
     }
 
     fn checkRoadWin(self: *Board) void {
@@ -407,42 +460,82 @@ pub const Board = struct {
 
         const opponent_controlled = if (opponent == .White)
             (self.white_control & ~self.standing_stones)
-        else
-            (self.black_control & ~self.standing_stones);
+            else
+                (self.black_control & ~self.standing_stones);
 
-        if (hasRoad(current_controlled, .Vertical) or hasRoad(current_controlled, .Horizontal)) {
+            if (hasRoad(current_controlled, .Vertical) or hasRoad(current_controlled, .Horizontal)) {
+                self.game_status = Result{
+                    .road = 1,
+                    .flat = 0,
+                    .color = if (current == .White) 0 else 1,
+                    .ongoing = 0,
+                };
+                return;
+            }
+
+            if (hasRoad(opponent_controlled, .Vertical) or hasRoad(opponent_controlled, .Horizontal)) {
+                self.game_status = Result{
+                    .road = 1,
+                    .flat = 0,
+                    .color = if (opponent == .White) 0 else 1,
+                    .ongoing = 0,
+                };
+                return;
+            }
+
             self.game_status = Result{
-                .road = 1,
+                .road = 0,
                 .flat = 0,
-                .color = if (current == .White) 0 else 1,
-                .ongoing = 0,
+                .color = 0,
+                .ongoing = 1,
             };
-            return;
-        }
-
-        if (hasRoad(opponent_controlled, .Vertical) or hasRoad(opponent_controlled, .Horizontal)) {
-            self.game_status = Result{
-                .road = 1,
-                .flat = 0,
-                .color = if (opponent == .White) 0 else 1,
-                .ongoing = 0,
-            };
-            return;
-        }
-
-        self.game_status = Result{
-            .road = 0,
-            .flat = 0,
-            .color = 0,
-            .ongoing = 1,
-        };
     }
 
-    pub fn isSquareEmpty(self: *const Board, pos: Position) bool {
-        return self.squares[pos].len == 0;
+    fn hasRoad(player_controlled: Bitboard, search_dir: SearchDirection) bool {
+        if (tracy_enable) {
+            const z = tracy.trace(@src());
+            defer z.end();
+        }
+        const start_mask: Bitboard = if (search_dir == .Vertical) row_masks[board_size - 1] else column_masks[0];
+        const end_mask: Bitboard = if (search_dir == .Vertical) row_masks[0] else column_masks[board_size - 1];
+
+        if (search_dir == .Vertical) {
+            for (row_masks) |mask| {
+                if ((player_controlled & mask) == 0) return false;
+            }
+        } else {
+            for (column_masks) |mask| {
+                if ((player_controlled & mask) == 0) return false;
+            }
+        }
+
+        var reachable: Bitboard = player_controlled & start_mask;
+        if (reachable == 0) return false;
+
+        var previous: Bitboard = 0;
+        while (reachable != previous) {
+            previous = reachable;
+
+            const shifted_left = ((reachable & ~column_masks[board_size - 1]) << 1) & player_controlled;
+            const shifted_right = ((reachable & ~column_masks[0]) >> 1) & player_controlled;
+            const shifted_up = ((reachable & ~row_masks[board_size - 1]) << board_size) & player_controlled;
+            const shifted_down = ((reachable & ~row_masks[0]) >> board_size) & player_controlled;
+
+            reachable |= shifted_left | shifted_right | shifted_up | shifted_down;
+
+            if ((reachable & end_mask) != 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
-    pub fn recomputeHash(self: *Board) void {
+    pub inline fn isSquareEmpty(self: *const Board, pos: Position) bool {
+        return getBit(self.empty_squares, pos);
+    }
+
+    pub inline fn recomputeHash(self: *Board) void {
         zob.computeZobristHash(self);
     }
 
@@ -474,9 +567,89 @@ pub const Board = struct {
                 }
             }
         }
+
+        self.road_dirty_white = true;
+        self.road_dirty_black = true;
     }
 
-    pub fn pushPieceToSquare(self: *Board, pos: Position, piece: Piece) void {
+    fn roadMaskForColor(self: *Board, color: Color) Bitboard {
+        const controlled = if (color == .White)
+            (self.white_control & ~self.standing_stones)
+        else
+            (self.black_control & ~self.standing_stones);
+        return controlled & ~self.standing_stones;
+    }
+
+    fn ensureRoadUpToDate(self: *Board, color: Color) void {
+        if (color == .White) {
+            if (!self.road_dirty_white) return;
+            const road_mask = self.roadMaskForColor(.White);
+            self.white_road_dsf.rebuildFromMask(road_mask);
+            self.road_dirty_white = false;
+        }
+        else {
+            if (!self.road_dirty_black) return;
+            const road_mask = self.roadMaskForColor(.Black);
+            self.black_road_dsf.rebuildFromMask(road_mask);
+            self.road_dirty_black = false;
+        }
+    }
+
+    inline fn markRoadDirty(self: *Board, color: Color) void {
+        if (color == .White) {
+            self.road_dirty_white = true;
+        } else {
+            self.road_dirty_black = true;
+        }
+    }
+
+    inline fn isRoadTopPiece(piece: ?Piece) bool {
+        if (piece == null) return false;
+        return piece.?.stone_type != .Standing;
+    }
+
+    inline fn roadTopColor(piece: ?Piece) ?Color {
+        if (piece == null) return null;
+        if (piece.?.stone_type == .Standing) return null;
+        return piece.?.color;
+    }
+
+    pub fn onTopPieceChanged(self: *Board, pos: Position, old_piece: ?Piece, new_piece: ?Piece) void {
+        const old_color = roadTopColor(old_piece);
+        const new_color = roadTopColor(new_piece);
+
+        if (old_color == new_color) return;
+
+        if (old_color == null and new_color != null) {
+            const color = new_color.?;
+            self.ensureRoadUpToDate(color);
+            const mask = self.roadMaskForColor(color);
+            if (color == .White) {
+                self.white_road_dsf.addPosIncremental(pos, mask);
+            } else {
+                self.black_road_dsf.addPosIncremental(pos, mask);
+            }
+            return;
+        }
+
+        if (old_color) |color| {
+            self.markRoadDirty(color);
+        }
+        if (new_color) |color| {
+            self.markRoadDirty(color);
+        }
+    }
+
+    fn hasRoadUF(self: *Board, color: Color) bool {
+        self.ensureRoadUpToDate(color);
+        if (color == .White) {
+            return self.white_road_dsf.has_road_h or self.white_road_dsf.has_road_v;
+        } else {
+            return self.black_road_dsf.has_road_h or self.black_road_dsf.has_road_v;
+        }
+    }
+
+    pub fn pushPieceToSquareNoUpdate(self: *Board, pos: Position, piece: Piece) void {
         // if (tracy_enable) {
         //     const z = tracy.trace(@src());
         //     defer z.end();
@@ -500,12 +673,51 @@ pub const Board = struct {
         }
     }
 
+    pub fn pushPieceToSquare(self: *Board, pos: Position, piece: Piece) void {
+        // if (tracy_enable) {
+        //     const z = tracy.trace(@src());
+        //     defer z.end();
+        // }
+        var old_top_piece: ?Piece = null;
+
+        if (do_road_uf) {
+            old_top_piece = self.squares[pos].top();
+        }
+
+        self.squares[pos].pushPiece(piece);
+        // update bitboards
+        clearBit(&self.empty_squares, pos);
+        clearBit(&self.standing_stones, pos);
+        clearBit(&self.capstones, pos);
+        clearBit(&self.white_control, pos);
+        clearBit(&self.black_control, pos);
+        if (piece.stone_type == .Standing) {
+            setBit(&self.standing_stones, pos);
+        } else if (piece.stone_type == .Capstone) {
+            setBit(&self.capstones, pos);
+        }
+        if (piece.color == .White) {
+            setBit(&self.white_control, pos);
+        } else {
+            setBit(&self.black_control, pos);
+        }
+
+        if (!do_road_uf) {
+            self.onTopPieceChanged(pos, old_top_piece, self.squares[pos].top());
+        }
+    }
+
     pub fn removePiecesFromSquare(self: *Board, pos: Position, count: usize) !void {
         // if (tracy_enable) {
         //     const z = tracy.trace(@src());
         //     defer z.end();
         // }
         const square = &self.squares[pos];
+        var old_top_piece: ?Piece = null;
+
+        if (do_road_uf) {
+            old_top_piece = square.top();
+        }
 
         clearBit(&self.white_control, pos);
         clearBit(&self.black_control, pos);
@@ -527,6 +739,9 @@ pub const Board = struct {
             } else {
                 setBit(&self.black_control, pos);
             }
+        }
+        if (!do_road_uf) {
+            self.onTopPieceChanged(pos, old_top_piece, square.top());
         }
     }
 };
@@ -620,44 +835,4 @@ pub fn bbGetNthPositionFrom(bb: Bitboard, dir: Direction, n: usize) Bitboard {
         };
     }
     return result;
-}
-
-fn hasRoad(player_controlled: Bitboard, search_dir: SearchDirection) bool {
-    if (tracy_enable) {
-        const z = tracy.trace(@src());
-        defer z.end();
-    }
-    const start_mask: Bitboard = if (search_dir == .Vertical) row_masks[board_size - 1] else column_masks[0];
-    const end_mask: Bitboard = if (search_dir == .Vertical) row_masks[0] else column_masks[board_size - 1];
-
-    if (search_dir == .Vertical) {
-        for (row_masks) |mask| {
-            if ((player_controlled & mask) == 0) return false;
-        }
-    } else {
-        for (column_masks) |mask| {
-            if ((player_controlled & mask) == 0) return false;
-        }
-    }
-
-    var reachable: Bitboard = player_controlled & start_mask;
-    if (reachable == 0) return false;
-
-    var previous: Bitboard = 0;
-    while (reachable != previous) {
-        previous = reachable;
-
-        const shifted_left = ((reachable & ~column_masks[board_size - 1]) << 1) & player_controlled;
-        const shifted_right = ((reachable & ~column_masks[0]) >> 1) & player_controlled;
-        const shifted_up = ((reachable & ~row_masks[board_size - 1]) << board_size) & player_controlled;
-        const shifted_down = ((reachable & ~row_masks[0]) >> board_size) & player_controlled;
-
-        reachable |= shifted_left | shifted_right | shifted_up | shifted_down;
-
-        if ((reachable & end_mask) != 0) {
-            return true;
-        }
-    }
-
-    return false;
 }

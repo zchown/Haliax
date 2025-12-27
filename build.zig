@@ -51,8 +51,21 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const magic_module = b.createModule(.{
+        .root_source_file = b.path("Tak/src/magics.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const road_module = b.createModule(.{
+        .root_source_file = b.path("Tak/src/road.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     board_module.addImport("zobrist", zobrist_module);
     board_module.addImport("tracy", tracy_module);
+    board_module.addImport("road", road_module);
 
     zobrist_module.addImport("board", board_module);
     zobrist_module.addImport("tracy", tracy_module);
@@ -63,10 +76,20 @@ pub fn build(b: *std.Build) void {
     moves_module.addImport("sympathy", sympathy_module);
     moves_module.addImport("zobrist", zobrist_module);
     moves_module.addImport("tracy", tracy_module);
+    moves_module.addImport("magics", magic_module);
 
     ptn_module.addImport("board", board_module);
 
     tps_module.addImport("board", board_module);
+
+    magic_module.addImport("board", board_module);
+    magic_module.addImport("tracy", tracy_module);
+    magic_module.addImport("sympathy", sympathy_module);
+    magic_module.addImport("zobrist", zobrist_module);
+
+    road_module.addImport("board", board_module);
+    road_module.addImport("tracy", tracy_module);
+    road_module.addImport("zobrist", zobrist_module);
 
     const exe = b.addExecutable(.{
         .name = "Haliax",
@@ -158,6 +181,7 @@ pub fn build(b: *std.Build) void {
         test_exe.root_module.addImport("zobrist", zobrist_module);
         test_exe.root_module.addImport("sympathy", sympathy_module);
         test_exe.root_module.addImport("tracy", tracy_module);
+        test_exe.root_module.addImport("magics", magic_module);
 
         const test_options = b.addOptions();
         test_exe.root_module.addOptions("build_options", test_options);

@@ -1,6 +1,7 @@
 const std = @import("std");
 const brd = @import("board");
 const moves = @import("moves");
+const magic = @import("magics");
 const tps = @import("tps");
 const ptn = @import("ptn");
 const testing = std.testing;
@@ -386,7 +387,7 @@ test "standing blocker" {
     defer testing.allocator.free(move_string);
     // std.debug.print("Testing move: {s}\n", .{move_string});
 
-    const steps = moves.numSteps(&board, brd.getPos(3, 1), .North);
+    const steps = magic.numSteps(&board, brd.getPos(3, 1), .North);
     try testing.expectEqual(@as(usize, 4), steps);
 }
 
