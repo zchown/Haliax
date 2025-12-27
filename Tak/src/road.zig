@@ -5,7 +5,7 @@ const tracy = @import("tracy");
 const tracy_enable = tracy.build_options.enable_tracy;
 
 // not doing path compression can be faster
-const do_compression = false;
+const do_compression = true;
 
 const EdgeMask = packed struct(u4) {
     north: u1 = 0,
@@ -15,7 +15,7 @@ const EdgeMask = packed struct(u4) {
 };
 
 // disjoint set forest for road detection
-pub const RoadDSF = struct {
+pub const RoadUF = struct {
     parent: [brd.num_squares]usize,
     rank: [brd.num_squares]usize,
     active: [brd.num_squares]bool,
@@ -23,8 +23,8 @@ pub const RoadDSF = struct {
     has_road_h: bool,
     has_road_v: bool,
 
-    pub fn init() RoadDSF {
-        var dsf = RoadDSF{
+    pub fn init() RoadUF {
+        var uf = RoadUF{
             .parent = [_]usize{0} ** brd.num_squares,
             .rank = [_]usize{0} ** brd.num_squares,
             .active = [_]bool{false} ** brd.num_squares,
@@ -32,11 +32,11 @@ pub const RoadDSF = struct {
             .has_road_h = false,
             .has_road_v = false,
         };
-        dsf.clear();
-        return dsf;
+        uf.clear();
+        return uf;
     }
 
-    pub fn clear(self: *RoadDSF) void {
+    pub fn clear(self: *RoadUF) void {
         @memset(&self.rank, 0);
         @memset(&self.active, false);
         @memset(&self.edges, EdgeMask{});
@@ -53,14 +53,16 @@ pub const RoadDSF = struct {
         const col: usize = @as(usize, @intCast(pos)) % brd.board_size;
 
         var mask: EdgeMask = EdgeMask{};
-        mask.north = @intFromBool(row == 0);
-        mask.south = @intFromBool(row == brd.board_size - 1);
+        mask.north = @intFromBool(row == brd.board_size - 1);
+        mask.south = @intFromBool(row == 0);
         mask.west = @intFromBool(col == 0);
         mask.east = @intFromBool(col == brd.board_size - 1);
+
+        // std.debug.print("Pos: {},{} Mask N:{} S:{} E:{} W:{}\n", .{row, col, mask.north, mask.south, mask.east, mask.west});
         return mask;
     }
 
-    fn find(self: *RoadDSF, i: usize) usize {
+    fn find(self: *RoadUF, i: usize) usize {
         if (tracy_enable) {
             const z = tracy.trace(@src());
             defer z.end();
@@ -88,7 +90,7 @@ pub const RoadDSF = struct {
         return root;
     }
 
-    fn unionDSF(self: *RoadDSF, a: usize, b: usize) void {
+    fn unionUF(self: *RoadUF, a: usize, b: usize) void {
         if (tracy_enable) {
             const z = tracy.trace(@src());
             defer z.end();
@@ -116,7 +118,7 @@ pub const RoadDSF = struct {
         self.has_road_v = self.has_road_v or ((combined_edges_int & 0b0011) == 0b0011);
     }
 
-    fn activate(self: *RoadDSF, pos: brd.Position) void {
+    fn activate(self: *RoadUF, pos: brd.Position) void {
         const i: usize = @as(usize, @intCast(pos));
         self.active[i] = true;
 
@@ -129,7 +131,7 @@ pub const RoadDSF = struct {
         self.has_road_v = self.has_road_v or ((e & 0b0011) == 0b0011);
     }
 
-    pub fn rebuildFromMask(self: *RoadDSF, road_mask: brd.Bitboard) void {
+    pub fn rebuildFromMask(self: *RoadUF, road_mask: brd.Bitboard) void {
         if (tracy_enable) {
             const z = tracy.trace(@src());
             defer z.end();
@@ -137,9 +139,14 @@ pub const RoadDSF = struct {
 
         self.clear();
 
+        // std.debug.print("Rebuilding RoadUF from mask {x}\n", .{road_mask});
+        // brd.printBB(road_mask);
+
         for (0..brd.num_squares) |sq| {
             const pos: brd.Position = @as(brd.Position, @intCast(sq));
-            if ((road_mask & brd.getPositionBB(pos)) == 1) {
+            // std.debug.print("Checking pos {}\n", .{sq});
+            if ((road_mask & brd.getPositionBB(pos)) != 0) {
+                // std.debug.print("Activating pos {}\n", .{sq});
                 self.activate(pos);
             }
         }
@@ -152,20 +159,20 @@ pub const RoadDSF = struct {
             if (brd.nextPosition(pos, .East)) |nxt| {
                 const nsq: usize = @as(usize, @intCast(nxt));
                 if (self.active[nsq]) {
-                    self.unionDSF(sq, nsq);
+                    self.unionUF(sq, nsq);
                 }
             }
 
             if (brd.nextPosition(pos, .North)) |nxt| {
                 const nsq: usize = @as(usize, @intCast(nxt));
                 if (self.active[nsq]) {
-                    self.unionDSF(sq, nsq);
+                    self.unionUF(sq, nsq);
                 }
             }
         }
     }
 
-    pub fn addPosIncremental(self: *RoadDSF, pos: brd.Position, road_mask: brd.Bitboard) void {
+    pub fn addPosIncremental(self: *RoadUF, pos: brd.Position, road_mask: brd.Bitboard) void {
         if (tracy_enable) {
             const z = tracy.trace(@src());
             defer z.end();
@@ -179,28 +186,28 @@ pub const RoadDSF = struct {
         if (brd.nextPosition(pos, .East)) |nxt| {
             const nsq: usize = @as(usize, @intCast(nxt));
             if ((road_mask & brd.getPositionBB(nxt)) != 0 and self.active[nsq]) {
-                self.unionDSF(i, nsq);
+                self.unionUF(i, nsq);
             }
         }
 
         if (brd.nextPosition(pos, .West)) |nxt| {
             const nsq: usize = @as(usize, @intCast(nxt));
             if ((road_mask & brd.getPositionBB(nxt)) != 0 and self.active[nsq]) {
-                self.unionDSF(i, nsq);
+                self.unionUF(i, nsq);
             }
         }
 
         if (brd.nextPosition(pos, .North)) |nxt| {
             const nsq: usize = @as(usize, @intCast(nxt));
             if ((road_mask & brd.getPositionBB(nxt)) != 0 and self.active[nsq]) {
-                self.unionDSF(i, nsq);
+                self.unionUF(i, nsq);
             }
         }
 
         if (brd.nextPosition(pos, .South)) |nxt| {
             const nsq: usize = @as(usize, @intCast(nxt));
             if ((road_mask & brd.getPositionBB(nxt)) != 0 and self.active[nsq]) {
-                self.unionDSF(i, nsq);
+                self.unionUF(i, nsq);
             }
         }
     }

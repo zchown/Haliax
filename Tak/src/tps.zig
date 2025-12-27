@@ -184,6 +184,8 @@ fn updateBoardState(b: *Board) !void {
     b.black_stones_remaining = black_stones;
     b.white_capstones_remaining = white_caps;
     b.black_capstones_remaining = black_caps;
+    b.road_dirty_white = true;
+    b.road_dirty_black = true;
 }
 
 pub fn boardToTPS(allocator: std.mem.Allocator, b: *const Board) ![]u8 {

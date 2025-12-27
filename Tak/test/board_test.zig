@@ -187,7 +187,7 @@ test "Empty square check" {
     try testing.expect(board.isSquareEmpty(brd.getPos(0, 0)));
     try testing.expect(board.isSquareEmpty(brd.getPos(5, 5)));
 
-    board.squares[brd.getPos(0, 0)].pushPiece(brd.Piece{
+    board.pushPieceToSquare(brd.getPos(0, 0), brd.Piece{
         .stone_type = .Flat,
         .color = .White,
     });
@@ -322,4 +322,17 @@ test "Check hard roads" {
         .ongoing = 0,
     };
     try testing.expectEqual(expected5, result5);
+
+    // Test 6: Horizontal road win for White
+    const tps_str6 = "[TPS x6/1,1,1,1,1,1/x6/x6/x6/x5,1 2 2]";
+    var board6 = try tps.parseTPS(tps_str6);
+    const result6 = board6.checkResult();
+
+    const expected6 = brd.Result{
+        .road = 1,
+        .flat = 0,
+        .color = 0,
+        .ongoing = 0,
+    };
+    try testing.expectEqual(expected6, result6);
 }

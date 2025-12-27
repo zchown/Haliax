@@ -257,6 +257,13 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
     const length: usize = @popCount(move.pattern);
     const end_pos: brd.Position = brd.nthPositionFrom(move.position, dir, length) orelse unreachable;
 
+    board.supress_road_incremental = true;
+    defer {
+        board.supress_road_incremental = false;
+        board.road_dirty_white = true;
+        board.road_dirty_black = true;
+    }
+
     // crush if needed
     if (board.squares[end_pos].top()) |stone| {
         if (stone.stone_type == brd.StoneType.Standing) {
@@ -271,7 +278,6 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
     var cur_pos: brd.Position = move.position;
     var stones_moved: usize = 0;
     const count = move.movedStones();
-    var prev_top: ?brd.Piece = board.squares[move.position].top();
 
     for (0..8) |i| {
         const bit = (move.pattern >> (7 - @as(u3, @intCast(i)))) & 0x1;
@@ -283,20 +289,15 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
             }
         }
         if (bit == 1) {
-            board.onTopPieceChanged(cur_pos, board.squares[cur_pos].top(), prev_top);
             cur_pos = brd.nextPosition(cur_pos, dir) orelse unreachable;
-            prev_top = board.squares[cur_pos].top();
         }
         const stack_index = board.squares[move.position].len - count + stones_moved;
         const to_move: brd.Piece = board.squares[move.position].stack[stack_index].?;
-        // board.squares[cur_pos].push(to_move);
         board.pushPieceToSquareNoUpdate(cur_pos, to_move);
         stones_moved += 1;
     }
-    board.onTopPieceChanged(cur_pos, board.squares[cur_pos].top(), prev_top);
 
-    // board.squares[move.position].remove(move.movedStones()) catch unreachable;
-    board.removePiecesFromSquare(move.position, stones_moved) catch unreachable;
+    board.removePiecesFromSquareNoUpdate(move.position, stones_moved) catch unreachable;
 
     cur_pos = move.position;
 }
@@ -396,9 +397,13 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
         const z = tracy.trace(@src());
         defer z.end();
     }
+    board.supress_road_incremental = true;
     defer {
         board.half_move_count -= 1;
         board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
+        board.supress_road_incremental = false;
+        board.road_dirty_white = true;
+        board.road_dirty_black = true;
     }
 
     if (move.pattern == 0) {
@@ -408,7 +413,7 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
         const color = top_stone.color;
 
         const popped: brd.Piece = top_stone;
-        board.removePiecesFromSquare(move.position, 1) catch unreachable;
+        board.removePiecesFromSquareNoUpdate(move.position, 1) catch unreachable;
 
         switch (popped.stone_type) {
             .Flat => {
@@ -460,7 +465,7 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
         const bit = (move.pattern >> @as(u3, @intCast(i))) & 0x1;
 
         const top_piece: brd.Piece = board.squares[cur_pos].stack[board.squares[cur_pos].len - 1] orelse unreachable;
-        board.removePiecesFromSquare(cur_pos, 1) catch unreachable;
+        board.removePiecesFromSquareNoUpdate(cur_pos, 1) catch unreachable;
         piece_buffer[piece_count] = top_piece;
         piece_count += 1;
 
@@ -469,15 +474,14 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
         }
     }
 
-    const prev_top = board.squares[move.position].top();
     for (0..piece_count) |j| {
         board.pushPieceToSquareNoUpdate(move.position, piece_buffer[piece_count - 1 - j]);
     }
-    board.onTopPieceChanged(move.position, prev_top, board.squares[move.position].top());
 
     if (board.crushMoves[board.half_move_count - 1 % brd.crush_map_size] == .Crush) {
         board.squares[end_pos].stack[board.squares[end_pos].len - 1].?.stone_type = brd.StoneType.Standing;
         board.standing_stones |= brd.getPositionBB(end_pos);
+
     }
 
     zob.updateZobristHash(board, move);

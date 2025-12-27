@@ -20,7 +20,7 @@ pub const crush_map_size = 256;
 
 // whether to use union-find for road detection
 // alternative is flood fill bitboard method
-const do_road_uf = false;
+const do_road_uf = true;
 
 pub const StoneType = enum(u2) {
     Flat,
@@ -300,10 +300,11 @@ pub const Board = struct {
 
     game_status: Result,
 
-    white_road_dsf: road.RoadDSF,
-    black_road_dsf: road.RoadDSF,
+    white_road_uf: road.RoadUF,
+    black_road_uf: road.RoadUF,
     road_dirty_white: bool,
     road_dirty_black: bool,
+    supress_road_incremental: bool,
 
     pub fn init() Board {
         var brd = Board{
@@ -327,10 +328,11 @@ pub const Board = struct {
                 .color = 0,
                 .ongoing = 1,
             },
-            .white_road_dsf = road.RoadDSF.init(),
-            .black_road_dsf = road.RoadDSF.init(),
+            .white_road_uf = road.RoadUF.init(),
+            .black_road_uf = road.RoadUF.init(),
             .road_dirty_white = false,
             .road_dirty_black = false,
+            .supress_road_incremental = false,
         };
 
         zob.computeZobristHash(&brd);
@@ -357,10 +359,11 @@ pub const Board = struct {
             .color = 0,
             .ongoing = 1,
         };
-        self.white_road_dsf.clear();
-        self.black_road_dsf.clear();
+        self.white_road_uf.clear();
+        self.black_road_uf.clear();
         self.road_dirty_white = false;
         self.road_dirty_black = false;
+        self.supress_road_incremental = false;
         zob.computeZobristHash(self);
     }
 
@@ -419,6 +422,7 @@ pub const Board = struct {
             const z = tracy.trace(@src());
             defer z.end();
         }
+
         const current: Color = self.to_move.opposite();
         const opponent: Color = self.to_move;
 
@@ -573,10 +577,13 @@ pub const Board = struct {
     }
 
     fn roadMaskForColor(self: *Board, color: Color) Bitboard {
-        const controlled = if (color == .White)
-            (self.white_control & ~self.standing_stones)
-        else
-            (self.black_control & ~self.standing_stones);
+        var controlled: Bitboard = 0;
+        if (color == .White) {
+            controlled = self.white_control;
+        }
+        else {
+            controlled = self.black_control;
+        }
         return controlled & ~self.standing_stones;
     }
 
@@ -584,13 +591,13 @@ pub const Board = struct {
         if (color == .White) {
             if (!self.road_dirty_white) return;
             const road_mask = self.roadMaskForColor(.White);
-            self.white_road_dsf.rebuildFromMask(road_mask);
+            self.white_road_uf.rebuildFromMask(road_mask);
             self.road_dirty_white = false;
         }
         else {
             if (!self.road_dirty_black) return;
             const road_mask = self.roadMaskForColor(.Black);
-            self.black_road_dsf.rebuildFromMask(road_mask);
+            self.black_road_uf.rebuildFromMask(road_mask);
             self.road_dirty_black = false;
         }
     }
@@ -620,14 +627,24 @@ pub const Board = struct {
 
         if (old_color == new_color) return;
 
+        if (self.supress_road_incremental) {
+            if (old_color) |color| {
+                self.markRoadDirty(color);
+            }
+            if (new_color) |color| {
+                self.markRoadDirty(color);
+            }
+            return;
+        }
+
         if (old_color == null and new_color != null) {
             const color = new_color.?;
             self.ensureRoadUpToDate(color);
             const mask = self.roadMaskForColor(color);
             if (color == .White) {
-                self.white_road_dsf.addPosIncremental(pos, mask);
+                self.white_road_uf.addPosIncremental(pos, mask);
             } else {
-                self.black_road_dsf.addPosIncremental(pos, mask);
+                self.black_road_uf.addPosIncremental(pos, mask);
             }
             return;
         }
@@ -643,9 +660,9 @@ pub const Board = struct {
     fn hasRoadUF(self: *Board, color: Color) bool {
         self.ensureRoadUpToDate(color);
         if (color == .White) {
-            return self.white_road_dsf.has_road_h or self.white_road_dsf.has_road_v;
+            return self.white_road_uf.has_road_h or self.white_road_uf.has_road_v;
         } else {
-            return self.black_road_dsf.has_road_h or self.black_road_dsf.has_road_v;
+            return self.black_road_uf.has_road_h or self.black_road_uf.has_road_v;
         }
     }
 
@@ -704,6 +721,36 @@ pub const Board = struct {
 
         if (!do_road_uf) {
             self.onTopPieceChanged(pos, old_top_piece, self.squares[pos].top());
+        }
+    }
+
+    pub fn removePiecesFromSquareNoUpdate(self: *Board, pos: Position, count: usize) !void {
+        // if (tracy_enable) {
+        //     const z = tracy.trace(@src());
+        //     defer z.end();
+        // }
+        const square = &self.squares[pos];
+
+        clearBit(&self.white_control, pos);
+        clearBit(&self.black_control, pos);
+        clearBit(&self.standing_stones, pos);
+        clearBit(&self.capstones, pos);
+
+        try square.removePieces(count);
+        if (square.len == 0) {
+            setBit(&self.empty_squares, pos);
+        } else {
+            const top_piece = square.top().?;
+            if (top_piece.stone_type == .Standing) {
+                setBit(&self.standing_stones, pos);
+            } else if (top_piece.stone_type == .Capstone) {
+                setBit(&self.capstones, pos);
+            }
+            if (top_piece.color == .White) {
+                setBit(&self.white_control, pos);
+            } else {
+                setBit(&self.black_control, pos);
+            }
         }
     }
 
@@ -835,4 +882,16 @@ pub fn bbGetNthPositionFrom(bb: Bitboard, dir: Direction, n: usize) Bitboard {
         };
     }
     return result;
+}
+
+pub fn printBB(bb: Bitboard) void {
+    std.debug.print("Bitboard:\n", .{});
+    for (0..board_size) |row| {
+        for (0..board_size) |col| {
+            const pos: Position = getPos(col, @as(usize, row));
+            const occupied = getBit(bb, pos);
+            _ = std.debug.print("{s} ", .{if (occupied) "#" else "."});
+        }
+        _ = std.debug.print("\n", .{});
+    }
 }
