@@ -20,7 +20,9 @@ pub const crush_map_size = 256;
 
 // whether to use union-find for road detection
 // alternative is flood fill bitboard method
-const do_road_uf = true;
+// slower for 6x6 might be faster for 8x8 needs 
+// benchmarking
+const do_road_uf = false;
 
 pub const StoneType = enum(u2) {
     Flat,
@@ -719,7 +721,7 @@ pub const Board = struct {
             setBit(&self.black_control, pos);
         }
 
-        if (!do_road_uf) {
+        if (do_road_uf) {
             self.onTopPieceChanged(pos, old_top_piece, self.squares[pos].top());
         }
     }
@@ -810,9 +812,7 @@ pub inline fn isOnBoard(x: isize, y: isize) bool {
 }
 
 pub inline fn isOnBoardPos(pos: Position) bool {
-    const x = @as(isize, @intCast(getX(pos)));
-    const y = @as(isize, @intCast(getY(pos)));
-    return isOnBoard(x, y);
+    return pos < @as(Position, num_squares);
 }
 
 pub inline fn directionOffset(dir: Direction) isize {
@@ -833,20 +833,19 @@ pub inline fn opositeDirection(dir: Direction) Direction {
     };
 }
 
-pub fn nextPosition(pos: Position, dir: Direction) ?Position {
-    // if (!@inComptime() and tracy_enable) {
-    //     const z = tracy.trace(@src());
-    //     defer z.end();
-    // }
-    const x = @as(isize, @intCast(getX(pos)));
-    const y = @as(isize, @intCast(getY(pos)));
-    const offset = directionOffset(dir);
-    const new_x = x + (if (dir == .East or dir == .West) offset else 0);
-    const new_y = y + (if (dir == .North or dir == .South) @divTrunc(offset, @as(isize, board_size)) else 0);
-    if (isOnBoard(new_x, new_y)) {
-        return getPos(@as(usize, @intCast((new_x))), @as(usize, @intCast(new_y)));
-    } else {
-        return null;
+pub inline fn nextPosition(pos: Position, dir: Direction) ?Position {
+    const bs: Position = @as(Position, board_size);
+    switch (dir) {
+        .North => return if (pos + bs < @as(Position, num_squares)) pos + bs else null,
+        .South => return if (pos >= bs) pos - bs else null,
+        .East  => {
+            const x: Position = pos % bs;
+            return if (x + 1 < bs) pos + 1 else null;
+        },
+        .West  => {
+            const x: Position = pos % bs;
+            return if (x != 0) pos - 1 else null;
+        },
     }
 }
 
@@ -855,19 +854,28 @@ pub fn previousPosition(pos: Position, dir: Direction) ?Position {
 }
 
 pub fn nthPositionFrom(pos: Position, dir: Direction, n: usize) ?Position {
-    // if (!@inComptime() and tracy_enable) {
-    //     const z = tracy.trace(@src());
-    //     defer z.end();
-    // }
-    var current_pos: Position = pos;
-    for (0..n) |_| {
-        const next_pos = nextPosition(current_pos, dir);
-        if (next_pos == null) {
-            return null;
-        }
-        current_pos = next_pos.?;
+    const bs_u: usize = board_size;
+    const pos_u: usize = @intCast(pos);
+
+    switch (dir) {
+        .North => {
+            const step = n * bs_u;
+            const new_u = pos_u + step;
+            return if (new_u < num_squares) @as(Position, @intCast(new_u)) else null;
+        },
+        .South => {
+            const step = n * bs_u;
+            return if (pos_u >= step) @as(Position, @intCast(pos_u - step)) else null;
+        },
+        .East => {
+            const x = pos_u % bs_u;
+            return if (x + n < bs_u) @as(Position, @intCast(pos_u + n)) else null;
+        },
+        .West => {
+            const x = pos_u % bs_u;
+            return if (n <= x) @as(Position, @intCast(pos_u - n)) else null;
+        },
     }
-    return current_pos;
 }
 
 pub fn bbGetNthPositionFrom(bb: Bitboard, dir: Direction, n: usize) Bitboard {

@@ -213,15 +213,12 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
         zob.updateZobristHash(board, move);
     }
     if (move.pattern == 0) {
-
         const place_color = if (board.half_move_count < 2) board.to_move.opposite() else board.to_move;
 
         board.pushPieceToSquare(move.position, brd.Piece{
             .color = place_color,
             .stone_type = @enumFromInt(move.flag),
         });
-
-        brd.clearBit(&board.empty_squares, move.position);
 
         switch (@as(brd.StoneType, @enumFromInt(move.flag))) {
             .Flat => {
@@ -232,7 +229,6 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
                 }
             },
             .Standing => {
-                brd.setBit(&board.standing_stones, move.position);
                 if (place_color == brd.Color.White) {
                     board.white_stones_remaining -= 1;
                 } else {
@@ -240,7 +236,6 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
                 }
             },
             .Capstone => {
-                brd.setBit(&board.capstones, move.position);
                 if (place_color == brd.Color.White) {
                     board.white_capstones_remaining -= 1;
                 } else {
@@ -257,11 +252,16 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
     const length: usize = @popCount(move.pattern);
     const end_pos: brd.Position = brd.nthPositionFrom(move.position, dir, length) orelse unreachable;
 
-    board.supress_road_incremental = true;
-    defer {
-        board.supress_road_incremental = false;
+    if (brd.do_road_uf) {
+        board.supress_road_incremental = true;
         board.road_dirty_white = true;
         board.road_dirty_black = true;
+    }
+
+    defer {
+        if (brd.do_road_uf) {
+            board.supress_road_incremental = false;
+        }
     }
 
     // crush if needed
@@ -397,13 +397,19 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
         const z = tracy.trace(@src());
         defer z.end();
     }
-    board.supress_road_incremental = true;
+
+    if (brd.do_road_uf) {
+        board.supress_road_incremental = true;
+        board.road_dirty_white = true;
+        board.road_dirty_black = true;
+    }
+
     defer {
         board.half_move_count -= 1;
         board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
-        board.supress_road_incremental = false;
-        board.road_dirty_white = true;
-        board.road_dirty_black = true;
+        if (brd.do_road_uf) {
+            board.supress_road_incremental = false;
+        }
     }
 
     if (move.pattern == 0) {
