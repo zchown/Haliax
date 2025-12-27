@@ -22,7 +22,7 @@ pub const crush_map_size = 256;
 // alternative is flood fill bitboard method
 // slower for 6x6 might be faster for 8x8 needs 
 // benchmarking
-const do_road_uf = false;
+pub const do_road_uf = false;
 
 pub const StoneType = enum(u2) {
     Flat,
@@ -456,6 +456,7 @@ pub const Board = struct {
             const z = tracy.trace(@src());
             defer z.end();
         }
+
         const current: Color = self.to_move.opposite();
         const opponent: Color = self.to_move;
 
@@ -502,6 +503,7 @@ pub const Board = struct {
             const z = tracy.trace(@src());
             defer z.end();
         }
+
         const start_mask: Bitboard = if (search_dir == .Vertical) row_masks[board_size - 1] else column_masks[0];
         const end_mask: Bitboard = if (search_dir == .Vertical) row_masks[0] else column_masks[board_size - 1];
 
@@ -669,10 +671,6 @@ pub const Board = struct {
     }
 
     pub fn pushPieceToSquareNoUpdate(self: *Board, pos: Position, piece: Piece) void {
-        // if (tracy_enable) {
-        //     const z = tracy.trace(@src());
-        //     defer z.end();
-        // }
         self.squares[pos].pushPiece(piece);
         // update bitboards
         clearBit(&self.empty_squares, pos);
@@ -693,10 +691,6 @@ pub const Board = struct {
     }
 
     pub fn pushPieceToSquare(self: *Board, pos: Position, piece: Piece) void {
-        // if (tracy_enable) {
-        //     const z = tracy.trace(@src());
-        //     defer z.end();
-        // }
         var old_top_piece: ?Piece = null;
 
         if (do_road_uf) {
@@ -727,10 +721,6 @@ pub const Board = struct {
     }
 
     pub fn removePiecesFromSquareNoUpdate(self: *Board, pos: Position, count: usize) !void {
-        // if (tracy_enable) {
-        //     const z = tracy.trace(@src());
-        //     defer z.end();
-        // }
         const square = &self.squares[pos];
 
         clearBit(&self.white_control, pos);
@@ -757,10 +747,6 @@ pub const Board = struct {
     }
 
     pub fn removePiecesFromSquare(self: *Board, pos: Position, count: usize) !void {
-        // if (tracy_enable) {
-        //     const z = tracy.trace(@src());
-        //     defer z.end();
-        // }
         const square = &self.squares[pos];
         var old_top_piece: ?Piece = null;
 

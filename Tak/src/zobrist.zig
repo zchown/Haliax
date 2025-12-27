@@ -61,10 +61,6 @@ pub fn computeZobristHash(board: *brd.Board) void {
 }
 
 pub fn updateZobristHash(board: *brd.Board, move: brd.Move) void {
-    // if (tracy_enabled) {
-    //     const z = tracy.trace(@src());
-    //     defer z.end();
-    // }
     if (move.pattern == 0) {
         var color: brd.Color = board.to_move;
         if (board.half_move_count > 2) {

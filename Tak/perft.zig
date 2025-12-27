@@ -3,6 +3,9 @@ const brd = @import("board");
 const mvs = @import("moves");
 const tps = @import("tps");
 const ptn = @import("ptn");
+const tracy = @import("tracy");
+
+const tracy_enable = tracy.build_options.enable_tracy;
 
 const mode = @import("builtin").mode;
 
@@ -16,6 +19,11 @@ fn mnpsFromNs(nodes: u64, elapsed_ns: u64) f64 {
 }
 
 pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []const u8) !void {
+    if (tracy_enable) {
+        const tr = tracy.trace(@src());
+        defer tr.end();
+    }
+
     var board = try tps.parseTPS(tps_string);
 
     var total_nodes: u64 = 0;
@@ -63,12 +71,12 @@ pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []c
 
 fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_lists: []mvs.MoveList) !usize {
 
-    if (mode == .Debug) {
-        if (depth == 0) return 1;
-    }
-    else {
-        if (depth == 1) return mvs.countMoves(board);
-    }
+    // if (mode == .Debug) {
+    //     if (depth == 0) return 1;
+    // }
+    // else {
+    //     if (depth == 1) return mvs.countMoves(board);
+    // }
 
     if (depth == 0) return 1;
 

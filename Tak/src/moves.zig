@@ -31,10 +31,6 @@ pub const MoveList = struct {
     }
 
     pub fn resize(self: *MoveList, new_capacity: usize) !void {
-        // if (tracy_enable) {
-        //     const z = tracy.trace(@src());
-        //     defer z.end();
-        // }
         const new_moves = try self.allocator.alloc(brd.Move, new_capacity);
         std.mem.copyForwards(brd.Move, new_moves[0..self.count], self.moves[0..self.count]);
         self.allocator.free(self.moves);
@@ -43,10 +39,6 @@ pub const MoveList = struct {
     }
 
     pub fn append(self: *MoveList, move: brd.Move) !void {
-        // if (tracy_enable) {
-        //     const z = tracy.trace(@src());
-        //     defer z.end();
-        // }
         if (self.count >= self.capacity) {
             try self.resize(self.capacity * 2);
         }
@@ -201,6 +193,7 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
         const z = tracy.trace(@src());
         defer z.end();
     }
+
     var did_crush: bool = false;
 
     defer {
@@ -498,6 +491,7 @@ pub fn generateMoves(board: *const brd.Board, moves: *MoveList) !void {
         const z = tracy.trace(@src());
         defer z.end();
     }
+
     if (board.half_move_count < 2) {
         for (0..brd.board_size * brd.board_size) |pos| {
             if (board.isSquareEmpty(@as(brd.Position, @intCast(pos)))) {
@@ -517,10 +511,11 @@ pub fn generateMoves(board: *const brd.Board, moves: *MoveList) !void {
 }
 
 fn generatePlaceMoves(board: *const brd.Board, moves: *MoveList) !void {
-    // if (tracy_enable) {
-    //     const z = tracy.trace(@src());
-    //     defer z.end();
-    // }
+    if (tracy_enable) {
+        const z = tracy.trace(@src());
+        defer z.end();
+    }
+
     const color: brd.Color = board.to_move;
     const stones_remaining = if (color == brd.Color.White) board.white_stones_remaining else board.black_stones_remaining;
     const capstone_remaining = if (color == brd.Color.White) board.white_capstones_remaining else board.black_capstones_remaining;
@@ -550,10 +545,11 @@ fn generatePlaceMoves(board: *const brd.Board, moves: *MoveList) !void {
 }
 
 fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
-    // if (tracy_enable) {
-    //     const z = tracy.trace(@src());
-    //     defer z.end();
-    // }
+    if (tracy_enable) {
+        const z = tracy.trace(@src());
+        defer z.end();
+    }
+
     const color: brd.Color = board.to_move;
     const color_bits = if (color == brd.Color.White) board.white_control else board.black_control;
 

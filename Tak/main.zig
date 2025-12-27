@@ -5,9 +5,15 @@ const tps = @import("tps");
 const perft = @import("perft.zig");
 const tracy = @import("tracy");
 
+const tracy_enable = tracy.build_options.enable_tracy;
+
 pub fn main() !void {
-    const tr = tracy.trace(@src());
-    defer tr.end();
+
+    if (tracy_enable) {
+        const tr = tracy.trace(@src());
+        defer tr.end();
+    }
+
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     var allocator = gpa.allocator();
 
@@ -19,10 +25,15 @@ pub fn main() !void {
 
     const max_depth: usize = 5;
 
+    std.debug.print("{s}\n", .{tps_string});
     try perft.runPerft(&allocator, max_depth + 1, tps_string);
+    std.debug.print("{s}\n", .{tps_string2});
     try perft.runPerft(&allocator, max_depth, tps_string2);
+    std.debug.print("{s}\n", .{tps_string3});
     try perft.runPerft(&allocator, max_depth + 2, tps_string3);
+    std.debug.print("{s}\n", .{tps_string4});
     try perft.runPerft(&allocator, max_depth, tps_string4);
+    std.debug.print("{s}\n", .{tps_string5});
     try perft.runPerft(&allocator, max_depth, tps_string5);
 
 }
