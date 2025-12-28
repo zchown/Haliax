@@ -299,6 +299,8 @@ pub const Board = struct {
     capstones: Bitboard,
 
     crushMoves: [crush_map_size]Crush,
+    hash_history: [256]zob.ZobristHash = [_]zob.ZobristHash{0} ** 256,
+    hash_history_len: usize = 0,
 
     game_status: Result,
 
@@ -378,6 +380,7 @@ pub const Board = struct {
             const z = tracy.trace(@src());
             defer z.end();
         }
+
         self.updateResult();
         return self.game_status;
     }
@@ -778,6 +781,39 @@ pub const Board = struct {
         if (!do_road_uf) {
             self.onTopPieceChanged(pos, old_top_piece, square.top());
         }
+    }
+
+    pub fn recountReserves(self: *Board) void {
+        var white_stones_used: usize = 0;
+        var black_stones_used: usize = 0;
+        var white_capstones_used: usize = 0;
+        var black_capstones_used: usize = 0;
+
+        for (0..num_squares) |pos| {
+            const square = &self.squares[pos];
+            for (0..square.len) |i| {
+                const piece = square.stack[i].?;
+                switch (piece.color) {
+                    .White => {
+                        switch (piece.stone_type) {
+                            .Flat, .Standing => white_stones_used += 1,
+                            .Capstone => white_capstones_used += 1,
+                        }
+                    },
+                    .Black => {
+                        switch (piece.stone_type) {
+                            .Flat, .Standing => black_stones_used += 1,
+                            .Capstone => black_capstones_used += 1,
+                        }
+                    },
+                }
+            }
+        }
+
+        self.white_stones_remaining = stone_count - white_stones_used;
+        self.black_stones_remaining = stone_count - black_stones_used;
+        self.white_capstones_remaining = capstone_count - white_capstones_used;
+        self.black_capstones_remaining = capstone_count - black_capstones_used;
     }
 };
 

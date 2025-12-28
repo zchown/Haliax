@@ -335,4 +335,71 @@ test "Check hard roads" {
         .ongoing = 0,
     };
     try testing.expectEqual(expected6, result6);
+
+    // Test 7
+    const tps_str7 = "[TPS 2,x2,2221,x2/x2,1,21,x2/2221S,2,21C,1,2,2/1,1,1,1,2S,1/1,12,1,1112C,1,1/1,x,2S,x2,1 2 30]";
+    var board7 = try tps.parseTPS(tps_str7);
+    const result7 = board7.checkResult();
+
+    const expected7 = brd.Result{
+        .road = 1,
+        .flat = 0,
+        .color = 0,
+        .ongoing = 0,
+    };
+    try testing.expectEqual(expected7, result7);
+
+    // Test 8
+    const tps_str8 = "[TPS 2,12,1,2,22221S,2/1,2,211111,1212C,x,121212S/x,1,21C,2,2,x/1,1,1,2,212,1S/1,1,1S,x,2,x/1,x2,2,2,x 1 39]";
+    var board8 = try tps.parseTPS(tps_str8);
+    const result8 = board8.checkResult();
+
+    const expected8 = brd.Result{
+        .road = 1,
+        .flat = 0,
+        .color = 1,
+        .ongoing = 0,
+    };
+    try testing.expectEqual(expected8, result8);
+
+    // Test 9
+    const tps_str9 = "[TPS 1,x5/x,2,x,2,x2/1,1,12C,221S,x2/2S,1C,1,1121,1,1/x,2,x4/2,x2,12,x2 2 17]";
+    var board9 = try tps.parseTPS(tps_str9);
+    const result9 = board9.checkResult();
+
+    const expected9 = brd.Result{
+        .road = 1,
+        .flat = 0,
+        .color = 0,
+        .ongoing = 0,
+    };
+    try testing.expectEqual(expected9, result9);
+
+    // Test 10
+    const tps_str10 = "[TPS x,2,1,2,1,x/2,2,1,1,111221,2S/1,21,221C,112C,1,2/12,2,2S,x,1,1/1,1,1,12S,x2/2,1,x4 2 27]";
+    var board10 = try tps.parseTPS(tps_str10);
+    const result10 = board10.checkResult();
+
+    const expected10 = brd.Result{
+        .road = 1,
+        .flat = 0,
+        .color = 0,
+        .ongoing = 0,
+    };
+    try testing.expectEqual(expected10, result10);
+
+    // Test 11
+    const tps_str11 = "[TPS 1,x3,2,21S/12112112C,1,1,2,2,2/x4,1,2/x2,1,1,x,2/x,21C,1221,2,x,2/x2,1,x2,2 1 25]";
+    var board11 = try tps.parseTPS(tps_str11);
+    const result11 = board11.checkResult();
+
+    const expected11 = brd.Result{
+        .road = 1,
+        .flat = 0,
+        .color = 1,
+        .ongoing = 0,
+    };
+    try testing.expectEqual(expected11, result11);
 }
+
+

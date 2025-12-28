@@ -426,3 +426,13 @@ test "lots of standing stones" {
 
     try testing.expectEqual(@as(usize, 18), move_list.count);
 }
+
+test "crush slide generating" {
+    const tps_string = "[TPS x5,2S/1,x4,1C/x6/x6/2,x5/x6 1 3]";
+    var allocator = testing.allocator;
+    var move_list = try moves.MoveList.init(&allocator, 1000);
+    defer move_list.deinit();
+    const board = tps.parseTPS(tps_string) catch unreachable;
+    try moves.generateMoves(&board, &move_list);
+    try testing.expectEqual(@as(usize, 70), move_list.count);
+}

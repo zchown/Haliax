@@ -11,6 +11,11 @@ const zobrist_table: [brd.num_squares][brd.num_colors][brd.num_piece_types][brd.
     break :blk initZobristTable();
 };
 
+const zobrist_turn_hash: ZobristHash = blk: {
+    var seed: u64 = 0xFEDCBA0987654321;
+    break :blk splitMix64(&seed);
+};
+
 fn splitMix64(key: *u64) u64 {
     key.* = key.* +% 0x9E3779B97F4A7C15;
     var z = key.*;
@@ -37,6 +42,10 @@ fn initZobristTable() [brd.num_squares][brd.num_colors][brd.num_piece_types][brd
 pub fn computeZobristHash(board: *brd.Board) void {
     var hash: ZobristHash = 0;
 
+    if (board.to_move == .Black) {
+        hash ^= zobrist_turn_hash;
+    }
+
     for (0..brd.num_squares) |sq| {
         const square = board.squares[sq];
         const start: usize = if (@as(isize, @intCast(square.len)) - brd.zobrist_stack_depth < 0) 0 else square.len - brd.zobrist_stack_depth;
@@ -61,6 +70,7 @@ pub fn computeZobristHash(board: *brd.Board) void {
 }
 
 pub fn updateZobristHash(board: *brd.Board, move: brd.Move) void {
+    board.zobrist_hash ^= zobrist_turn_hash;
     if (move.pattern == 0) {
         var color: brd.Color = board.to_move;
         if (board.half_move_count > 2) {

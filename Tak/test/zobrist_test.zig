@@ -278,6 +278,7 @@ test "zobrist hash after slide move" {
     for (0..brd.num_squares) |i| {
         verify_board.squares[i] = board.squares[i];
     }
+    verify_board.to_move = .Black;
     zob.computeZobristHash(&verify_board);
     try testing.expectEqual(board.zobrist_hash, verify_board.zobrist_hash);
 }

@@ -24,7 +24,6 @@ pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []c
         defer tr.end();
     }
 
-    var board = try tps.parseTPS(tps_string);
 
     var total_nodes: u64 = 0;
 
@@ -41,6 +40,10 @@ pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []c
     var total_timer = try std.time.Timer.start();
 
     for (1..max_depth + 1) |depth| {
+        var board = try tps.parseTPS(tps_string);
+        board.recomputeBitboards();
+        board.recountReserves();
+        board.recomputeHash();
         var depth_timer = try std.time.Timer.start();
 
         const nodes_usize = try perft(allocator, &board, depth, move_lists);
@@ -70,14 +73,6 @@ pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []c
 }
 
 fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_lists: []mvs.MoveList) !usize {
-
-    // if (mode == .Debug) {
-    //     if (depth == 0) return 1;
-    // }
-    // else {
-    //     if (depth == 1) return mvs.countMoves(board);
-    // }
-
     if (depth == 0) return 1;
 
     var nodes: usize = 0;
@@ -109,6 +104,8 @@ fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_li
                 std.debug.print("Offending move: {s}\n", .{move_ptn});
                 return err;
             };
+            board.recomputeBitboards();
+            board.recountReserves();
             const post_tps = try tps.boardToTPS(allocator.*, board);
             defer allocator.free(post_tps);
             // board.recomputeHash();
@@ -123,6 +120,8 @@ fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_li
                 std.debug.print("Offending move: {s}\n", .{move_ptn});
                 return err;
             };
+            board.recomputeBitboards();
+            board.recountReserves();
             // board.recomputeHash();
             const tps_str = try tps.boardToTPS(allocator.*, board);
             defer allocator.free(tps_str);
