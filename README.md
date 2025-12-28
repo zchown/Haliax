@@ -33,54 +33,83 @@ Haliax was optimized using the tracy profiler to identify bottlenecks in the mov
 Running bulk perft a macbook air m4 on a variety of board positions yields the following results:
 
 [TPS x6/x6/x6/x6/x6/x6 1 1]
-Depth 1: 36 nodes in 0ms (36.00 MNPS)
-Depth 2: 1260 nodes in 0ms (272.43 MNPS)
-Depth 3: 132720 nodes in 0ms (879.18 MNPS)
-Depth 4: 13586048 nodes in 17ms (794.13 MNPS)
-Depth 5: 1253506520 nodes in 2083ms (601.50 MNPS)
+Depth 1: 36 nodes in 0ms (41.14 MNPS)
+Depth 2: 1260 nodes in 0ms (737.27 MNPS)
+Depth 3: 132720 nodes in 0ms (886.28 MNPS)
+Depth 4: 13586048 nodes in 15ms (868.37 MNPS)
+Depth 5: 1253506520 nodes in 1708ms (733.86 MNPS)
 
 Total nodes: 1267226584
-Total time: 2101ms
-Average speed: 603.08 MNPS
+Total time: 1723ms
+Average speed: 735.10 MNPS
 \==============================
+
 
 
 [TPS 2,2,21S,2,2,2/2,x,222221,2,2,x/1,1,2221C,x,111112C,2S/x,1,2S,x2,121211212/1,1,1212S,1S,2,1S/x2,2,1,21,1 1 42]
 Depth 1: 140 nodes in 0ms (56.00 MNPS)
-Depth 2: 21402 nodes in 0ms (236.92 MNPS)
-Depth 3: 2774593 nodes in 11ms (237.90 MNPS)
-Depth 4: 395359484 nodes in 1528ms (258.71 MNPS)
-Depth 5: 49338466729 nodes in 214808ms (229.69 MNPS)
+Depth 2: 21402 nodes in 0ms (277.05 MNPS)
+Depth 3: 2774593 nodes in 9ms (287.41 MNPS)
+Depth 4: 395359484 nodes in 1220ms (324.01 MNPS)
+Depth 5: 49338466729 nodes in 181676ms (271.57 MNPS)
 
 Total nodes: 49736622348
-Total time: 216348ms
-Average speed: 229.89 MNPS
+Total time: 182906ms
+Average speed: 271.92 MNPS
+\==============================
+
+
+
+[TPS 2S,2S,2S,2S,2S,2S/1S,1S,1S,1S,1S,1S/2S,2S,2S,2S,2S,2S/1S,1S,1S,1S,1S,1S/2S,2S,2S,2S,2S,2S/11,x5 1 3]
+Depth 1: 18 nodes in 0ms (13.09 MNPS)
+Depth 2: 317 nodes in 0ms (72.46 MNPS)
+Depth 3: 4243 nodes in 0ms (61.83 MNPS)
+Depth 4: 64855 nodes in 1ms (61.11 MNPS)
+Depth 5: 754479 nodes in 16ms (46.31 MNPS)
+
+Total nodes: 823912
+Total time: 17ms
+Average speed: 47.23 MNPS
+\==============================
+
+
+Allowing counting instead of full move generation for perft allows for better performance:
+
+[TPS x6/x6/x6/x6/x6/x6 1 1]
+Depth 1: 36 nodes in 0ms (857.14 MNPS)
+Depth 2: 1260 nodes in 0ms (703.13 MNPS)
+Depth 3: 132720 nodes in 0ms (3504.16 MNPS)
+Depth 4: 13586048 nodes in 4ms (3368.27 MNPS)
+Depth 5: 1253506520 nodes in 541ms (2315.18 MNPS)
+
+Total nodes: 1267226584
+Total time: 545ms
+Average speed: 2322.90 MNPS
+\==============================
+
+[TPS 2,2,21S,2,2,2/2,x,222221,2,2,x/1,1,2221C,x,111112C,2S/x,1,2S,x2,121211212/1,1,1212S,1S,2,1S/x2,2,1,21,1 1 42]
+Depth 1: 140 nodes in 0ms (335.73 MNPS)
+Depth 2: 23194 nodes in 0ms (452.94 MNPS)
+Depth 3: 2804034 nodes in 6ms (454.91 MNPS)
+Depth 4: 419297076 nodes in 810ms (517.16 MNPS)
+Depth 5: 50330081908 nodes in 113174ms (444.71 MNPS)
+
+Total nodes: 50752206352
+Total time: 113991ms
+Average speed: 445.23 MNPS
 \==============================
 
 
 [TPS 2S,2S,2S,2S,2S,2S/1S,1S,1S,1S,1S,1S/2S,2S,2S,2S,2S,2S/1S,1S,1S,1S,1S,1S/2S,2S,2S,2S,2S,2S/11,x5 1 3]
-Depth 1: 18 nodes in 0ms (11.37 MNPS)
-Depth 2: 317 nodes in 0ms (58.53 MNPS)
-Depth 3: 4243 nodes in 0ms (52.27 MNPS)
-Depth 4: 64855 nodes in 1ms (51.97 MNPS)
-Depth 5: 754479 nodes in 19ms (39.09 MNPS)
+Depth 1: 18 nodes in 0ms (39.22 MNPS)
+Depth 2: 317 nodes in 0ms (69.81 MNPS)
+Depth 3: 4243 nodes in 0ms (73.74 MNPS)
+Depth 4: 64855 nodes in 0ms (82.64 MNPS)
+Depth 5: 754479 nodes in 12ms (61.43 MNPS)
 
 Total nodes: 823912
-Total time: 20ms
-Average speed: 39.89 MNPS
-\==============================
-
-
-[TPS x4,2,1/x3,1,2,x/x3,1,2,x/x,1,1,1,1,2/x2,2,x,1C,x/2,x3,2112,x 2 11]
-Depth 1: 102 nodes in 0ms (58.29 MNPS)
-Depth 2: 7159 nodes in 0ms (186.76 MNPS)
-Depth 3: 670819 nodes in 2ms (293.04 MNPS)
-Depth 4: 48336683 nodes in 212ms (227.30 MNPS)
-Depth 5: 4271397891 nodes in 15718ms (271.74 MNPS)
-
-Total nodes: 4320412654
-Total time: 15933ms
-Average speed: 271.15 MNPS
+Total time: 13ms
+Average speed: 62.69 MNPS
 \==============================
 
 

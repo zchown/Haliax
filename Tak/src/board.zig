@@ -20,7 +20,7 @@ pub const crush_map_size = 256;
 
 // whether to use union-find for road detection
 // alternative is flood fill bitboard method
-// slower for 6x6 might be faster for 8x8 needs 
+// slower for 6x6 might be faster for 8x8 needs
 // benchmarking
 pub const do_road_uf = false;
 
@@ -299,8 +299,6 @@ pub const Board = struct {
     capstones: Bitboard,
 
     crushMoves: [crush_map_size]Crush,
-    hash_history: [256]zob.ZobristHash = [_]zob.ZobristHash{0} ** 256,
-    hash_history_len: usize = 0,
 
     game_status: Result,
 
@@ -381,12 +379,25 @@ pub const Board = struct {
             defer z.end();
         }
 
+        // if (checkHashRepetition(self)) {
+        //     self.game_status = Result{
+        //         .road = 0,
+        //         .flat = 0,
+        //         .color = 0,
+        //         .ongoing = 0,
+        //     };
+        //     return self.game_status;
+        // }
+
         self.updateResult();
         return self.game_status;
     }
 
     fn updateResult(self: *Board) void {
-        if (self.empty_squares == 0) {
+        const whites = self.white_stones_remaining + self.white_capstones_remaining;
+        const blacks = self.black_stones_remaining + self.black_capstones_remaining;
+
+        if (self.empty_squares == 0 or (whites * blacks) == 0) {
             const white_flats: Bitboard = (self.white_control & ~self.standing_stones) & ~self.capstones;
             const black_flats: Bitboard = (self.black_control & ~self.standing_stones) & ~self.capstones;
             const white_count: f64 = @as(f64, @floatFromInt(countBits(white_flats)));
@@ -418,6 +429,7 @@ pub const Board = struct {
                 self.checkRoadWinUF();
             } else {
                 self.checkRoadWin();
+            
             }
         }
     }
@@ -470,35 +482,35 @@ pub const Board = struct {
 
         const opponent_controlled = if (opponent == .White)
             (self.white_control & ~self.standing_stones)
-            else
-                (self.black_control & ~self.standing_stones);
+        else
+            (self.black_control & ~self.standing_stones);
 
-            if (hasRoad(current_controlled, .Vertical) or hasRoad(current_controlled, .Horizontal)) {
-                self.game_status = Result{
-                    .road = 1,
-                    .flat = 0,
-                    .color = if (current == .White) 0 else 1,
-                    .ongoing = 0,
-                };
-                return;
-            }
-
-            if (hasRoad(opponent_controlled, .Vertical) or hasRoad(opponent_controlled, .Horizontal)) {
-                self.game_status = Result{
-                    .road = 1,
-                    .flat = 0,
-                    .color = if (opponent == .White) 0 else 1,
-                    .ongoing = 0,
-                };
-                return;
-            }
-
+        if (hasRoad(current_controlled, .Vertical) or hasRoad(current_controlled, .Horizontal)) {
             self.game_status = Result{
-                .road = 0,
+                .road = 1,
                 .flat = 0,
-                .color = 0,
-                .ongoing = 1,
+                .color = if (current == .White) 0 else 1,
+                .ongoing = 0,
             };
+            return;
+        }
+
+        if (hasRoad(opponent_controlled, .Vertical) or hasRoad(opponent_controlled, .Horizontal)) {
+            self.game_status = Result{
+                .road = 1,
+                .flat = 0,
+                .color = if (opponent == .White) 0 else 1,
+                .ongoing = 0,
+            };
+            return;
+        }
+
+        self.game_status = Result{
+            .road = 0,
+            .flat = 0,
+            .color = 0,
+            .ongoing = 1,
+        };
     }
 
     fn hasRoad(player_controlled: Bitboard, search_dir: SearchDirection) bool {
@@ -587,8 +599,7 @@ pub const Board = struct {
         var controlled: Bitboard = 0;
         if (color == .White) {
             controlled = self.white_control;
-        }
-        else {
+        } else {
             controlled = self.black_control;
         }
         return controlled & ~self.standing_stones;
@@ -600,8 +611,7 @@ pub const Board = struct {
             const road_mask = self.roadMaskForColor(.White);
             self.white_road_uf.rebuildFromMask(road_mask);
             self.road_dirty_white = false;
-        }
-        else {
+        } else {
             if (!self.road_dirty_black) return;
             const road_mask = self.roadMaskForColor(.Black);
             self.black_road_uf.rebuildFromMask(road_mask);
@@ -855,50 +865,65 @@ pub inline fn opositeDirection(dir: Direction) Direction {
     };
 }
 
-pub inline fn nextPosition(pos: Position, dir: Direction) ?Position {
-    const bs: Position = @as(Position, board_size);
-    switch (dir) {
-        .North => return if (pos + bs < @as(Position, num_squares)) pos + bs else null,
-        .South => return if (pos >= bs) pos - bs else null,
-        .East  => {
-            const x: Position = pos % bs;
-            return if (x + 1 < bs) pos + 1 else null;
-        },
-        .West  => {
-            const x: Position = pos % bs;
-            return if (x != 0) pos - 1 else null;
-        },
-    }
-}
+pub fn nextPosition(pos: Position, dir: Direction) ?Position { 
+                                                        const x = @as(isize, @intCast(getX(pos))); const y = @as(isize, @intCast(getY(pos))); const offset = directionOffset(dir); const new_x = x + (if (dir == .East or dir == .West) offset else 0); const new_y = y + (if (dir == .North or dir == .South) @divTrunc(offset, @as(isize, board_size)) else 0); if (isOnBoard(new_x, new_y)) { return getPos(@as(usize, @intCast((new_x))), @as(usize, @intCast(new_y))); } else { return null; } }
+                                                               //
+// pub inline fn nextPosition(pos: Position, dir: Direction) ?Position {
+//     const bs: Position = @as(Position, board_size);
+//     switch (dir) {
+//         .North => return if (pos + bs < @as(Position, num_squares)) pos + bs else null,
+//         .South => return if (pos >= bs) pos - bs else null,
+//         .East => {
+//             const x: Position = pos % bs;
+//             return if (x + 1 < bs) pos + 1 else null;
+//         },
+//         .West => {
+//             const x: Position = pos % bs;
+//             return if (x != 0) pos - 1 else null;
+//         },
+//     }
+// }
 
 pub fn previousPosition(pos: Position, dir: Direction) ?Position {
     return nextPosition(pos, opositeDirection(dir));
 }
 
 pub fn nthPositionFrom(pos: Position, dir: Direction, n: usize) ?Position {
-    const bs_u: usize = board_size;
-    const pos_u: usize = @intCast(pos);
-
-    switch (dir) {
-        .North => {
-            const step = n * bs_u;
-            const new_u = pos_u + step;
-            return if (new_u < num_squares) @as(Position, @intCast(new_u)) else null;
-        },
-        .South => {
-            const step = n * bs_u;
-            return if (pos_u >= step) @as(Position, @intCast(pos_u - step)) else null;
-        },
-        .East => {
-            const x = pos_u % bs_u;
-            return if (x + n < bs_u) @as(Position, @intCast(pos_u + n)) else null;
-        },
-        .West => {
-            const x = pos_u % bs_u;
-            return if (n <= x) @as(Position, @intCast(pos_u - n)) else null;
-        },
+    var current_pos: Position = pos;
+    for (0..n) |_| {
+        const next_pos = nextPosition(current_pos, dir);
+        if (next_pos == null) {
+            return null;
+        }
+        current_pos = next_pos.?;
     }
+    return current_pos;
 }
+
+// pub fn nthPositionFrom(pos: Position, dir: Direction, n: usize) ?Position {
+//     const bs_u: usize = board_size;
+//     const pos_u: usize = @intCast(pos);
+//
+//     switch (dir) {
+//         .North => {
+//             const step = n * bs_u;
+//             const new_u = pos_u + step;
+//             return if (new_u < num_squares) @as(Position, @intCast(new_u)) else null;
+//         },
+//         .South => {
+//             const step = n * bs_u;
+//             return if (pos_u >= step) @as(Position, @intCast(pos_u - step)) else null;
+//         },
+//         .East => {
+//             const x = pos_u % bs_u;
+//             return if (x + n < bs_u) @as(Position, @intCast(pos_u + n)) else null;
+//         },
+//         .West => {
+//             const x = pos_u % bs_u;
+//             return if (n <= x) @as(Position, @intCast(pos_u - n)) else null;
+//         },
+//     }
+// }
 
 pub fn bbGetNthPositionFrom(bb: Bitboard, dir: Direction, n: usize) Bitboard {
     var result: Bitboard = bb;

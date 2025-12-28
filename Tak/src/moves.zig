@@ -204,8 +204,10 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
             board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
         }
         zob.updateZobristHash(board, move);
+        board.addHashToHistory();
     }
     if (move.pattern == 0) {
+        board.clearHashHistory();
         const place_color = if (board.half_move_count < 2) board.to_move.opposite() else board.to_move;
 
         board.pushPieceToSquare(move.position, brd.Piece{
@@ -391,6 +393,8 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
         defer z.end();
     }
 
+    board.removeHashFromHistory();
+
     if (brd.do_road_uf) {
         board.supress_road_incremental = true;
         board.road_dirty_white = true;
@@ -563,8 +567,8 @@ fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
 
         const dirs: [4]brd.Direction = .{ .North, .South, .East, .West };
 
-        inline for (dirs) |dir| {
-            var max_steps = numSteps(board, @as(u6, @intCast(pos)), dir);
+        for (dirs) |dir| {
+            var max_steps = magic.numSteps(board, @as(u6, @intCast(pos)), dir);
             if (max_steps > max_pickup) {
                 max_steps = max_pickup;
             }
@@ -604,35 +608,74 @@ fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
     }
 }
 
-fn numSteps2(board: *const brd.Board, position: brd.Position, direction: brd.Direction) usize {
-    var steps: usize = 0;
-    var cur_pos = position;
+pub fn countMoves(board: *const brd.Board) !usize {
 
-    while (true) {
-        const next_pos = brd.nextPosition(cur_pos, direction) orelse break;
-        if (board.squares[next_pos].top()) |stone| {
-            if (stone.stone_type == brd.StoneType.Standing or stone.stone_type == brd.StoneType.Capstone) {
-                break;
+    if (board.half_move_count < 2) {
+        return @popCount(board.empty_squares);
+    }
+
+    var total: usize = 0;
+    total += countPlaceMoves(board);
+    total += try countSlideMoves(board);
+
+    return total;
+}
+
+fn countPlaceMoves(board: *const brd.Board) usize {
+    const color: brd.Color = board.to_move;
+    const stones_remaining = if (color == brd.Color.White) board.white_stones_remaining else board.black_stones_remaining;
+    const capstone_remaining = if (color == brd.Color.White) board.white_capstones_remaining else board.black_capstones_remaining;
+    var total: usize = 0;
+    if (stones_remaining > 0) {
+        total += @popCount(board.empty_squares) * 2;
+    }
+    if (capstone_remaining > 0) {
+        total += @popCount(board.empty_squares);
+    }
+    return total;
+}
+
+fn countSlideMoves(board: *const brd.Board) !usize {
+    const color: brd.Color = board.to_move;
+    const color_bits = if (color == brd.Color.White) board.white_control else board.black_control;
+
+    var total: usize = 0;
+    for (0..brd.board_size * brd.board_size) |pos| {
+        if (!brd.getBit(color_bits, @as(u6, @intCast(pos)))) {
+            continue;
+        }
+        const can_crush: bool = (board.capstones & brd.getPositionBB(@as(u6, @intCast(pos))) != 0);
+
+        const max_pickup = if (board.squares[pos].len < brd.max_pickup) board.squares[pos].len else brd.max_pickup;
+
+        const dirs: [4]brd.Direction = .{ .North, .South, .East, .West };
+
+        for (dirs) |dir| {
+            var max_steps = magic.numSteps(board, @as(u6, @intCast(pos)), dir);
+            if (max_steps > max_pickup) {
+                max_steps = max_pickup;
+            }
+
+            var doing_crush: bool = false;
+
+            // check if we can crush at the end
+            if (can_crush and max_steps < brd.max_pickup) {
+                const start_bb = brd.getPositionBB(@as(u6, @intCast(pos)));
+                const end_pos_bb = brd.bbGetNthPositionFrom(start_bb, dir, @as(u6, @intCast(max_steps + 1)));
+                doing_crush = (board.standing_stones & end_pos_bb != 0);
+            }
+
+            if (doing_crush) {
+                const patterns = sym.patterns.combined_patterns[max_pickup - 1][max_steps];
+                total += patterns.len;
+            }
+            else if (max_steps > 0) {
+                const patterns = sym.patterns.patterns[max_pickup - 1][max_steps - 1];
+                total += patterns.len;
             }
         }
-        steps += 1;
-        cur_pos = next_pos;
     }
-
-    return steps;
+    return total;
 }
 
-fn numSteps(board: *const brd.Board, position: brd.Position, direction: brd.Direction) usize {
-    var steps: usize = 0;
-    var cur_pos = position;
-    const blockers = board.standing_stones | board.capstones;
-    while (true) {
-        const next_pos = brd.nextPosition(cur_pos, direction) orelse break;
-        if (blockers & brd.getPositionBB(next_pos) != 0) {
-            break;
-        }
-        steps += 1;
-        cur_pos = next_pos;
-    }
-    return steps;
-}
+

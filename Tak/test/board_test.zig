@@ -255,8 +255,6 @@ test "full tests" {
     try testing.expectEqual(expected, board.checkResult());
 }
 
-
-
 test "Check hard roads" {
     // Test 1: Game should continue (no road yet)
     const tps_str1 = "[TPS 1,x3,2C,x/1,x2,2,x2/1,1,1,2,2S,x/1,x,1,x3/2,x,1,x3/x,x,2,x3 2 1]";
@@ -400,6 +398,46 @@ test "Check hard roads" {
         .ongoing = 0,
     };
     try testing.expectEqual(expected11, result11);
+
+    // Test 13
+    const tps_str13 = "[TPS 2,x2,221S,x,2/x,121S,212S,2,21S,2/21,2,1,2,2,2111112C/2,2,21C,1,2,1/1,21S,1,211112S,2,1/2,x2,2,2,1 1 39]";
+    var board13 = try tps.parseTPS(tps_str13);
+    const result13 = board13.checkResult();
+    const expected13 = brd.Result{ .road = 1, .flat = 0, .color = 1, .ongoing = 0 };
+    try testing.expectEqual(expected13, result13);
+
+    // Test 14
+    const tps_str14 = "[TPS 2,x2,1,2,1/2,2,x,1,12,2/1,1,2221C,2,2,12/x,111112C,1,1,112S,1/x,1,2,1,1,1/x,1,2,2,x,1 2 28]";
+    var board14 = try tps.parseTPS(tps_str14);
+    const result14 = board14.checkResult();
+    const expected14 = brd.Result{ .road = 1, .flat = 0, .color = 0, .ongoing = 0 };
+    try testing.expectEqual(expected14, result14);
+
+    // Test 15
+    const tps_str15 = "[TPS 2,x3,1,1/2,2,2,1S,2,x/x,2,21221C,2,1112C,12/x,2,2,1,1,1/x,21,2,x2,1/x2,2,x2,1 1 22]";
+    var board15 = try tps.parseTPS(tps_str15);
+    const result15 = board15.checkResult();
+    const expected15 = brd.Result{ .road = 1, .flat = 0, .color = 1, .ongoing = 0 };
+    try testing.expectEqual(expected15, result15);
+
+    // Test 16
+    const tps_str16 = "[TPS 2,x,1,2,x2/x,2,1,2,x2/x3,2,x2/2,212,2S,112C,x,1/21C,221,1,12S,1,x/2S,1,1,1,1,1 2 22]";
+    var board16 = try tps.parseTPS(tps_str16);
+    const result16 = board16.checkResult();
+    const expected16 = brd.Result{ .road = 1, .flat = 0, .color = 0, .ongoing = 0 };
+    try testing.expectEqual(expected16, result16);
+
+    // Test 17
+    const tps_str17 = "[TPS 1,2221C,1,2,1,1/12112S,2,1,1,1,x/x4,1,2/2,21,x,2,12C,2/x,2,2,x,1,x/2,x5 2 21]";
+    var board17 = try tps.parseTPS(tps_str17);
+    const result17 = board17.checkResult();
+    const expected17 = brd.Result{ .road = 1, .flat = 0, .color = 0, .ongoing = 0 };
+    try testing.expectEqual(expected17, result17);
+
+    // Test 18
+    const tps_str18 = "[TPS 1,12,x,2,x2/2,12S,1,2,1S,x/1,x,121C,2,12112S,x/2,11112C,21,2,2,x/1,1,x,2,x2/1,1,x,2,x2 1 27]";
+    var board18 = try tps.parseTPS(tps_str18);
+    const result18 = board18.checkResult();
+    const expected18 = brd.Result{ .road = 1, .flat = 0, .color = 1, .ongoing = 0 };
+    try testing.expectEqual(expected18, result18);
 }
-
-

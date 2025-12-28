@@ -41,9 +41,6 @@ pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []c
 
     for (1..max_depth + 1) |depth| {
         var board = try tps.parseTPS(tps_string);
-        board.recomputeBitboards();
-        board.recountReserves();
-        board.recomputeHash();
         var depth_timer = try std.time.Timer.start();
 
         const nodes_usize = try perft(allocator, &board, depth, move_lists);
@@ -73,23 +70,24 @@ pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []c
 }
 
 fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_lists: []mvs.MoveList) !usize {
-    if (depth == 0) return 1;
-
     var nodes: usize = 0;
 
     if (board.checkResult().ongoing != 1) {
         return 0;
     }
 
+    if (depth == 1) return mvs.countMoves(board);
+
     var move_list = &move_lists[depth - 1];
     move_list.clear();
+
 
     try mvs.generateMoves(board, move_list);
 
     if (depth == 1) return move_list.count;
 
     for (move_list.moves[0..move_list.count]) |move| {
-        if (mode == .Debug or mode == .ReleaseSafe ) {
+        if (mode == .Debug or mode == .ReleaseSafe) {
             const pre_tps = try tps.boardToTPS(allocator.*, board);
             defer allocator.free(pre_tps);
             // board.recomputeHash();
