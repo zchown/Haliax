@@ -3,6 +3,7 @@ const brd = @import("board");
 const mvs = @import("moves");
 const tps = @import("tps");
 const ptn = @import("ptn");
+const gen = @import("move_generation");
 const tracy = @import("tracy");
 
 const tracy_enable = tracy.build_options.enable_tracy;
@@ -43,7 +44,8 @@ pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []c
         var board = try tps.parseTPS(tps_string);
         var depth_timer = try std.time.Timer.start();
 
-        const nodes_usize = try perft(allocator, &board, depth, move_lists);
+        // const nodes_usize = try perft(allocator, &board, depth, move_lists);
+        const nodes_usize = try perftGenerator(allocator, &board, depth);
         const nodes: u64 = @intCast(nodes_usize);
 
         const depth_ns = depth_timer.read();
@@ -69,8 +71,12 @@ pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []c
     std.debug.print("==============================\n\n\n\n", .{});
 }
 
-fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_lists: []mvs.MoveList) !usize {
+fn perftGenerator(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize) !usize {
     var nodes: usize = 0;
+
+    // if (depth == 0) {
+    //     return 1;
+    // }
 
     if (board.checkResult().ongoing != 1) {
         return 0;
@@ -78,15 +84,18 @@ fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_li
 
     // if (depth == 1) return mvs.countMoves(board);
 
-    var move_list = &move_lists[depth - 1];
-    move_list.clear();
+    var generator = gen.MoveGenerator.initDefault(board);
 
+    if (depth == 1) {
+        var count: usize = 0;
+        while (generator.next()) |_| {
+            count += 1;
+        }
+        return count;
+    }
 
-    try mvs.generateMoves(board, move_list);
-
-    if (depth == 1) return move_list.count;
-
-    for (move_list.moves[0..move_list.count]) |move| {
+    while (generator.next()) |move| {
+        // std.debug.print("Perft depth {d}: considering move {b}\n", .{depth, move.pattern});
         if (mode == .Debug or mode == .ReleaseSafe) {
             const pre_tps = try tps.boardToTPS(allocator.*, board);
             defer allocator.free(pre_tps);
@@ -107,7 +116,7 @@ fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_li
             const post_tps = try tps.boardToTPS(allocator.*, board);
             defer allocator.free(post_tps);
             // board.recomputeHash();
-            const child_nodes = try perft(allocator, board, depth - 1, move_lists);
+            const child_nodes = try perftGenerator(allocator, board, depth - 1);
             // board.recomputeHash();
             mvs.undoMoveWithCheck(board, move) catch |err| {
                 const move_ptn = try ptn.moveToString(allocator, move, board.to_move);
@@ -150,7 +159,7 @@ fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_li
         } 
         else {
             mvs.makeMove(board, move);
-            const child_nodes = try perft(allocator, board, depth - 1, move_lists);
+            const child_nodes = try perftGenerator(allocator, board, depth - 1);
             mvs.undoMove(board, move);
             nodes += child_nodes;
         }
@@ -158,4 +167,93 @@ fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_li
 
     return nodes;
 }
+// fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_lists: []mvs.MoveList) !usize {
+//     var nodes: usize = 0;
+//
+//     if (board.checkResult().ongoing != 1) {
+//         return 0;
+//     }
+//
+//     // if (depth == 1) return mvs.countMoves(board);
+//
+//     var move_list = &move_lists[depth - 1];
+//     move_list.clear();
+//
+//
+//     try mvs.generateMoves(board, move_list);
+//
+//     if (depth == 1) return move_list.count;
+//
+//     for (move_list.moves[0..move_list.count]) |move| {
+//         if (mode == .Debug or mode == .ReleaseSafe) {
+//             const pre_tps = try tps.boardToTPS(allocator.*, board);
+//             defer allocator.free(pre_tps);
+//             // board.recomputeHash();
+//             const pre_hash = board.zobrist_hash;
+//             const pre_tps_str = try tps.boardToTPS(allocator.*, board);
+//             defer allocator.free(pre_tps_str);
+//
+//             mvs.makeMoveWithCheck(board, move) catch |err| {
+//                 const move_ptn = try ptn.moveToString(allocator, move, board.to_move);
+//                 defer allocator.free(move_ptn);
+//                 std.debug.print("Error making move during perft: Board TPS:\n {s}\n", .{pre_tps_str});
+//                 std.debug.print("Offending move: {s}\n", .{move_ptn});
+//                 return err;
+//             };
+//             board.recomputeBitboards();
+//             board.recountReserves();
+//             const post_tps = try tps.boardToTPS(allocator.*, board);
+//             defer allocator.free(post_tps);
+//             // board.recomputeHash();
+//             const child_nodes = try perft(allocator, board, depth - 1, move_lists);
+//             // board.recomputeHash();
+//             mvs.undoMoveWithCheck(board, move) catch |err| {
+//                 const move_ptn = try ptn.moveToString(allocator, move, board.to_move);
+//                 defer allocator.free(move_ptn);
+//                 const tps_str = try tps.boardToTPS(allocator.*, board);
+//                 defer allocator.free(tps_str);
+//                 std.debug.print("Error undoing move during perft: Board TPS: {s}\n", .{tps_str});
+//                 std.debug.print("Offending move: {s}\n", .{move_ptn});
+//                 return err;
+//             };
+//             board.recomputeBitboards();
+//             board.recountReserves();
+//             // board.recomputeHash();
+//             const tps_str = try tps.boardToTPS(allocator.*, board);
+//             defer allocator.free(tps_str);
+//             if (std.mem.eql(u8, pre_tps, tps_str) == false) {
+//                 std.debug.print("TPS mismatch detected!\n", .{});
+//                 std.debug.print("Current TPS: {s}\n", .{tps_str});
+//                 std.debug.print("Expected TPS: {s}\n", .{pre_tps});
+//                 std.debug.print("Post-move TPS: {s}\n", .{post_tps});
+//
+//                 const move_ptn = try ptn.moveToString(allocator, move, board.to_move);
+//                 defer allocator.free(move_ptn);
+//                 std.debug.print("Offending move: {s}\n", .{move_ptn});
+//                 std.debug.print("Move pattern: {b}\n", .{move.pattern});
+//
+//                 return error.TPSMismatch;
+//             }
+//             if (pre_hash != board.zobrist_hash) {
+//                 std.debug.print("Zobrist hash mismatch detected!\n", .{});
+//                 std.debug.print("Current TPS: {s}\n", .{tps_str});
+//                 std.debug.print("Expected TPS: {s}\n", .{pre_tps});
+//                 const move_ptn = try ptn.moveToString(allocator, move, board.to_move);
+//                 defer allocator.free(move_ptn);
+//                 std.debug.print("Offending move: {s}\n", .{move_ptn});
+//                 return error.ZobristHashMismatch;
+//             }
+//             std.debug.assert(pre_hash == board.zobrist_hash);
+//             nodes += child_nodes;
+//         } 
+//         else {
+//             mvs.makeMove(board, move);
+//             const child_nodes = try perft(allocator, board, depth - 1, move_lists);
+//             mvs.undoMove(board, move);
+//             nodes += child_nodes;
+//         }
+//     }
+//
+//     return nodes;
+// }
 

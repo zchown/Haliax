@@ -63,6 +63,12 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const move_generation_module = b.createModule(.{
+        .root_source_file = b.path("Tak/src/move_generation.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
     board_module.addImport("zobrist", zobrist_module);
     board_module.addImport("tracy", tracy_module);
     board_module.addImport("road", road_module);
@@ -91,6 +97,11 @@ pub fn build(b: *std.Build) void {
     road_module.addImport("tracy", tracy_module);
     road_module.addImport("zobrist", zobrist_module);
 
+    move_generation_module.addImport("board", board_module);
+    move_generation_module.addImport("sympathy", sympathy_module);
+    move_generation_module.addImport("magics", magic_module);
+    move_generation_module.addImport("tracy", tracy_module);
+
     const exe = b.addExecutable(.{
         .name = "Haliax",
         .root_module = b.createModule(.{
@@ -108,6 +119,7 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addImport("zobrist", zobrist_module);
     exe.root_module.addImport("sympathy", sympathy_module);
     exe.root_module.addImport("tracy", tracy_module);
+    exe.root_module.addImport("move_generation", move_generation_module);
 
     b.installArtifact(exe);
 

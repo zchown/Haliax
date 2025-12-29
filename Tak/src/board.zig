@@ -379,16 +379,6 @@ pub const Board = struct {
             defer z.end();
         }
 
-        // if (checkHashRepetition(self)) {
-        //     self.game_status = Result{
-        //         .road = 0,
-        //         .flat = 0,
-        //         .color = 0,
-        //         .ongoing = 0,
-        //     };
-        //     return self.game_status;
-        // }
-
         self.updateResult();
         return self.game_status;
     }
@@ -429,7 +419,6 @@ pub const Board = struct {
                 self.checkRoadWinUF();
             } else {
                 self.checkRoadWin();
-            
             }
         }
     }

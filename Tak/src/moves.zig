@@ -520,7 +520,7 @@ fn generatePlaceMoves(board: *const brd.Board, moves: *MoveList) !void {
     const color: brd.Color = board.to_move;
     const stones_remaining = if (color == brd.Color.White) board.white_stones_remaining else board.black_stones_remaining;
     const capstone_remaining = if (color == brd.Color.White) board.white_capstones_remaining else board.black_capstones_remaining;
-    for (0..brd.board_size * brd.board_size) |pos| {
+    for (0..brd.num_squares) |pos| {
         if (board.isSquareEmpty(@as(brd.Position, @intCast(pos)))) {
             if (stones_remaining > 0) {
                 moves.appendUnsafe(brd.Move{
