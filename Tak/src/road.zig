@@ -4,7 +4,7 @@ const zobrist = @import("zobrist");
 const tracy = @import("tracy");
 const tracy_enable = tracy.build_options.enable_tracy;
 
-// not doing path compression can be faster
+// not doing path compression can be faster sometimes
 const do_compression = true;
 
 const EdgeMask = packed struct(u4) {

@@ -33,83 +33,61 @@ Haliax was optimized using the tracy profiler to identify bottlenecks in the mov
 Running bulk perft a macbook air m4 on a variety of board positions yields the following results:
 
 [TPS x6/x6/x6/x6/x6/x6 1 1]
-Depth 1: 36 nodes in 0ms (27.86 MNPS)
-Depth 2: 1260 nodes in 0ms (540.08 MNPS)
-Depth 3: 132720 nodes in 0ms (684.71 MNPS)
-Depth 4: 13586048 nodes in 21ms (646.67 MNPS)
-Depth 5: 1253506520 nodes in 2272ms (551.70 MNPS)
-Depth 6: 112449385016 nodes in 215556ms (521.67 MNPS)
+
+Depth 1: 36 nodes in 0ms (857.14 MNPS)
+
+Depth 2: 1260 nodes in 0ms (657.62 MNPS)
+
+Depth 3: 132720 nodes in 0ms (2683.77 MNPS)
+
+Depth 4: 13586048 nodes in 4ms (2947.78 MNPS)
+
+Depth 5: 1253506520 nodes in 609ms (2056.09 MNPS)
+
+Depth 6: 112449385016 nodes in 61890ms (1816.90 MNPS)
 
 Total nodes: 113716611600
-Total time: 217850ms
-Average speed: 521.99 MNPS
+Total time: 62505ms
+Average speed: 1819.32 MNPS
 
 
 [TPS 2,2,21S,2,2,2/2,x,222221,2,2,x/1,1,2221C,x,111112C,2S/x,1,2S,x2,121211212/1,1,1212S,1S,2,1S/x2,2,1,21,1 1 42]
-Depth 1: 140 nodes in 0ms (43.64 MNPS)
-Depth 2: 21402 nodes in 0ms (210.17 MNPS)
-Depth 3: 2774593 nodes in 13ms (208.97 MNPS)
-Depth 4: 395359484 nodes in 1734ms (227.91 MNPS)
-Depth 5: 48986506534 nodes in 250409ms (195.63 MNPS)
 
-Total nodes: 49384662153
-Total time: 252158ms
-Average speed: 195.85 MNPS
+Depth 1: 140 nodes in 0ms (239.73 MNPS)
 
+Depth 2: 21402 nodes in 0ms (411.24 MNPS)
 
-[TPS 2S,2S,2S,2S,2S,2S/1S,1S,1S,1S,1S,1S/2S,2S,2S,2S,2S,2S/1S,1S,1S,1S,1S,1S/2S,2S,2S,2S,2S,2S/11,x5 1 3]
-Depth 1: 18 nodes in 0ms (28.80 MNPS)
-Depth 2: 317 nodes in 0ms (43.98 MNPS)
-Depth 3: 4243 nodes in 0ms (39.12 MNPS)
-Depth 4: 64855 nodes in 1ms (39.14 MNPS)
-Depth 5: 754479 nodes in 24ms (30.48 MNPS)
-Depth 6: 11320295 nodes in 306ms (36.99 MNPS)
-Depth 7: 130812445 nodes in 4601ms (28.43 MNPS)
-Depth 8: 2042784845 nodes in 86939ms (23.50 MNPS)
-Depth 9: 24765415103 nodes in 684709ms (36.17 MNPS)
+Depth 3: 2774593 nodes in 6ms (435.87 MNPS)
 
-Total nodes: 26951156600
-Total time: 776584ms
-Average speed: 34.70 MNPS
+Depth 4: 395359484 nodes in 824ms (479.70 MNPS)
 
+Depth 5: 48986506534 nodes in 118471ms (413.49 MNPS)
 
-Allowing counting instead of full move generation for perft allows for better performance:
-
-Depth 1: 36 nodes in 0ms (34.55 MNPS)
-Depth 2: 1260 nodes in 0ms (795.96 MNPS)
-Depth 3: 132720 nodes in 0ms (817.79 MNPS)
-Depth 4: 13586048 nodes in 16ms (835.27 MNPS)
-Depth 5: 1253506520 nodes in 1769ms (708.39 MNPS)
-Depth 6: 112449385016 nodes in 74325ms (1512.94 MNPS)
-
-Total nodes: 113716611600
-Total time: 74941ms
-Average speed: 1517.41 MNPS
-
-
-[TPS 2,2,21S,2,2,2/2,x,222221,2,2,x/1,1,2221C,x,111112C,2S/x,1,2S,x2,121211212/1,1,1212S,1S,2,1S/x2,2,1,21,1 1 42]
-Depth 1: 140 nodes in 0ms (197.74 MNPS)
-Depth 2: 21402 nodes in 0ms (318.05 MNPS)
-Depth 3: 2774593 nodes in 8ms (340.07 MNPS)
-Depth 4: 395359484 nodes in 1054ms (375.07 MNPS)
-Depth 5: 48986506534 nodes in 151332ms (323.70 MNPS)
-
-Total nodes: 49384662153
-Total time: 152395ms
-Average speed: 324.06 MNPS
-
+Total nodes: 4938462153
+Total time: 119302ms
+Average speed: 413.94 MNPS
 
 [TPS 2S,2S,2S,2S,2S,2S/1S,1S,1S,1S,1S,1S/2S,2S,2S,2S,2S,2S/1S,1S,1S,1S,1S,1S/2S,2S,2S,2S,2S,2S/11,x5 1 3]
-Depth 1: 18 nodes in 0ms (39.22 MNPS)
-Depth 2: 317 nodes in 0ms (66.17 MNPS)
-Depth 3: 4243 nodes in 0ms (65.44 MNPS)
-Depth 4: 64855 nodes in 0ms (68.98 MNPS)
-Depth 5: 754479 nodes in 16ms (46.57 MNPS)
-Depth 6: 11320295 nodes in 192ms (58.81 MNPS)
-Depth 7: 130812445 nodes in 3098ms (42.22 MNPS)
-Depth 8: 2042784845 nodes in 36013ms (56.72 MNPS)
-Depth 9: 24765415103 nodes in 629055ms (39.37 MNPS)
+
+Depth 1: 18 nodes in 0ms (30.87 MNPS)
+
+Depth 2: 317 nodes in 0ms (83.60 MNPS)
+
+Depth 3: 4243 nodes in 0ms (73.26 MNPS)
+
+Depth 4: 64855 nodes in 0ms (86.03 MNPS)
+
+Depth 5: 754479 nodes in 12ms (59.26 MNPS)
+
+Depth 6: 11320295 nodes in 150ms (75.40 MNPS)
+
+Depth 7: 130812445 nodes in 2417ms (54.11 MNPS)
+
+Depth 8: 2042784845 nodes in 27906ms (73.20 MNPS)
+
+Depth 9: 24765415103 nodes in 461284ms (53.69 MNPS)
 
 Total nodes: 26951156600
-Total time: 668378ms
-Average speed: 40.32 MNPS
+Total time: 491772ms
+Average speed: 54.80 MNPS
+

@@ -44,8 +44,8 @@ pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []c
         var board = try tps.parseTPS(tps_string);
         var depth_timer = try std.time.Timer.start();
 
-        // const nodes_usize = try perft(allocator, &board, depth, move_lists);
-        const nodes_usize = try perftGenerator(allocator, &board, depth);
+        const nodes_usize = try perft(allocator, &board, depth, move_lists);
+        // const nodes_usize = try perftGenerator(allocator, &board, depth);
         const nodes: u64 = @intCast(nodes_usize);
 
         const depth_ns = depth_timer.read();
@@ -82,7 +82,7 @@ fn perftGenerator(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize
         return 0;
     }
 
-    if (depth == 1) return mvs.countMoves(board);
+    // if (depth == 1) return mvs.countMoves(board);
 
     var generator = gen.MoveGenerator.initDefault(board);
 
@@ -176,6 +176,9 @@ fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_li
     }
 
     // if (depth == 1) return mvs.countMoves(board);
+    // if (depth == 0) {
+    //     return 1;
+    // }
 
     var move_list = &move_lists[depth - 1];
     move_list.clear();

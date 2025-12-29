@@ -259,7 +259,6 @@ pub const MoveGenerator = struct {
             }
 
             if (self.computePatternForCurrent()) return true;
-
         }
     }
 
@@ -269,7 +268,7 @@ pub const MoveGenerator = struct {
 
         const idx: u6 = @intCast(@ctz(bb));
         self.state.current_pos = idx;
-        bb &= (bb - 1); 
+        bb &= (bb - 1);
         self.state.controlled_remaining = bb;
         return true;
     }
@@ -303,7 +302,6 @@ pub const MoveGenerator = struct {
 
         var max_steps: usize = magic.numSteps(self.board, pos, dir);
 
-
         const max_pickup: usize = @intCast(max_pickup_u8);
         if (max_steps > max_pickup) max_steps = max_pickup;
 
@@ -324,4 +322,3 @@ pub const MoveGenerator = struct {
         return true;
     }
 };
-
