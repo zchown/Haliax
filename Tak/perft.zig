@@ -82,7 +82,7 @@ fn perftGenerator(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize
         return 0;
     }
 
-    // if (depth == 1) return mvs.countMoves(board);
+    if (depth == 1) return mvs.countMoves(board);
 
     var generator = gen.MoveGenerator.initDefault(board);
 
@@ -167,93 +167,94 @@ fn perftGenerator(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize
 
     return nodes;
 }
-// fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_lists: []mvs.MoveList) !usize {
-//     var nodes: usize = 0;
-//
-//     if (board.checkResult().ongoing != 1) {
-//         return 0;
-//     }
-//
-//     // if (depth == 1) return mvs.countMoves(board);
-//
-//     var move_list = &move_lists[depth - 1];
-//     move_list.clear();
-//
-//
-//     try mvs.generateMoves(board, move_list);
-//
-//     if (depth == 1) return move_list.count;
-//
-//     for (move_list.moves[0..move_list.count]) |move| {
-//         if (mode == .Debug or mode == .ReleaseSafe) {
-//             const pre_tps = try tps.boardToTPS(allocator.*, board);
-//             defer allocator.free(pre_tps);
-//             // board.recomputeHash();
-//             const pre_hash = board.zobrist_hash;
-//             const pre_tps_str = try tps.boardToTPS(allocator.*, board);
-//             defer allocator.free(pre_tps_str);
-//
-//             mvs.makeMoveWithCheck(board, move) catch |err| {
-//                 const move_ptn = try ptn.moveToString(allocator, move, board.to_move);
-//                 defer allocator.free(move_ptn);
-//                 std.debug.print("Error making move during perft: Board TPS:\n {s}\n", .{pre_tps_str});
-//                 std.debug.print("Offending move: {s}\n", .{move_ptn});
-//                 return err;
-//             };
-//             board.recomputeBitboards();
-//             board.recountReserves();
-//             const post_tps = try tps.boardToTPS(allocator.*, board);
-//             defer allocator.free(post_tps);
-//             // board.recomputeHash();
-//             const child_nodes = try perft(allocator, board, depth - 1, move_lists);
-//             // board.recomputeHash();
-//             mvs.undoMoveWithCheck(board, move) catch |err| {
-//                 const move_ptn = try ptn.moveToString(allocator, move, board.to_move);
-//                 defer allocator.free(move_ptn);
-//                 const tps_str = try tps.boardToTPS(allocator.*, board);
-//                 defer allocator.free(tps_str);
-//                 std.debug.print("Error undoing move during perft: Board TPS: {s}\n", .{tps_str});
-//                 std.debug.print("Offending move: {s}\n", .{move_ptn});
-//                 return err;
-//             };
-//             board.recomputeBitboards();
-//             board.recountReserves();
-//             // board.recomputeHash();
-//             const tps_str = try tps.boardToTPS(allocator.*, board);
-//             defer allocator.free(tps_str);
-//             if (std.mem.eql(u8, pre_tps, tps_str) == false) {
-//                 std.debug.print("TPS mismatch detected!\n", .{});
-//                 std.debug.print("Current TPS: {s}\n", .{tps_str});
-//                 std.debug.print("Expected TPS: {s}\n", .{pre_tps});
-//                 std.debug.print("Post-move TPS: {s}\n", .{post_tps});
-//
-//                 const move_ptn = try ptn.moveToString(allocator, move, board.to_move);
-//                 defer allocator.free(move_ptn);
-//                 std.debug.print("Offending move: {s}\n", .{move_ptn});
-//                 std.debug.print("Move pattern: {b}\n", .{move.pattern});
-//
-//                 return error.TPSMismatch;
-//             }
-//             if (pre_hash != board.zobrist_hash) {
-//                 std.debug.print("Zobrist hash mismatch detected!\n", .{});
-//                 std.debug.print("Current TPS: {s}\n", .{tps_str});
-//                 std.debug.print("Expected TPS: {s}\n", .{pre_tps});
-//                 const move_ptn = try ptn.moveToString(allocator, move, board.to_move);
-//                 defer allocator.free(move_ptn);
-//                 std.debug.print("Offending move: {s}\n", .{move_ptn});
-//                 return error.ZobristHashMismatch;
-//             }
-//             std.debug.assert(pre_hash == board.zobrist_hash);
-//             nodes += child_nodes;
-//         } 
-//         else {
-//             mvs.makeMove(board, move);
-//             const child_nodes = try perft(allocator, board, depth - 1, move_lists);
-//             mvs.undoMove(board, move);
-//             nodes += child_nodes;
-//         }
-//     }
-//
-//     return nodes;
-// }
+
+fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_lists: []mvs.MoveList) !usize {
+    var nodes: usize = 0;
+
+    if (board.checkResult().ongoing != 1) {
+        return 0;
+    }
+
+    // if (depth == 1) return mvs.countMoves(board);
+
+    var move_list = &move_lists[depth - 1];
+    move_list.clear();
+
+
+    try mvs.generateMoves(board, move_list);
+
+    if (depth == 1) return move_list.count;
+
+    for (move_list.moves[0..move_list.count]) |move| {
+        if (mode == .Debug or mode == .ReleaseSafe) {
+            const pre_tps = try tps.boardToTPS(allocator.*, board);
+            defer allocator.free(pre_tps);
+            // board.recomputeHash();
+            const pre_hash = board.zobrist_hash;
+            const pre_tps_str = try tps.boardToTPS(allocator.*, board);
+            defer allocator.free(pre_tps_str);
+
+            mvs.makeMoveWithCheck(board, move) catch |err| {
+                const move_ptn = try ptn.moveToString(allocator, move, board.to_move);
+                defer allocator.free(move_ptn);
+                std.debug.print("Error making move during perft: Board TPS:\n {s}\n", .{pre_tps_str});
+                std.debug.print("Offending move: {s}\n", .{move_ptn});
+                return err;
+            };
+            board.recomputeBitboards();
+            board.recountReserves();
+            const post_tps = try tps.boardToTPS(allocator.*, board);
+            defer allocator.free(post_tps);
+            // board.recomputeHash();
+            const child_nodes = try perft(allocator, board, depth - 1, move_lists);
+            // board.recomputeHash();
+            mvs.undoMoveWithCheck(board, move) catch |err| {
+                const move_ptn = try ptn.moveToString(allocator, move, board.to_move);
+                defer allocator.free(move_ptn);
+                const tps_str = try tps.boardToTPS(allocator.*, board);
+                defer allocator.free(tps_str);
+                std.debug.print("Error undoing move during perft: Board TPS: {s}\n", .{tps_str});
+                std.debug.print("Offending move: {s}\n", .{move_ptn});
+                return err;
+            };
+            board.recomputeBitboards();
+            board.recountReserves();
+            // board.recomputeHash();
+            const tps_str = try tps.boardToTPS(allocator.*, board);
+            defer allocator.free(tps_str);
+            if (std.mem.eql(u8, pre_tps, tps_str) == false) {
+                std.debug.print("TPS mismatch detected!\n", .{});
+                std.debug.print("Current TPS: {s}\n", .{tps_str});
+                std.debug.print("Expected TPS: {s}\n", .{pre_tps});
+                std.debug.print("Post-move TPS: {s}\n", .{post_tps});
+
+                const move_ptn = try ptn.moveToString(allocator, move, board.to_move);
+                defer allocator.free(move_ptn);
+                std.debug.print("Offending move: {s}\n", .{move_ptn});
+                std.debug.print("Move pattern: {b}\n", .{move.pattern});
+
+                return error.TPSMismatch;
+            }
+            if (pre_hash != board.zobrist_hash) {
+                std.debug.print("Zobrist hash mismatch detected!\n", .{});
+                std.debug.print("Current TPS: {s}\n", .{tps_str});
+                std.debug.print("Expected TPS: {s}\n", .{pre_tps});
+                const move_ptn = try ptn.moveToString(allocator, move, board.to_move);
+                defer allocator.free(move_ptn);
+                std.debug.print("Offending move: {s}\n", .{move_ptn});
+                return error.ZobristHashMismatch;
+            }
+            std.debug.assert(pre_hash == board.zobrist_hash);
+            nodes += child_nodes;
+        } 
+        else {
+            mvs.makeMove(board, move);
+            const child_nodes = try perft(allocator, board, depth - 1, move_lists);
+            mvs.undoMove(board, move);
+            nodes += child_nodes;
+        }
+    }
+
+    return nodes;
+}
 
