@@ -76,7 +76,7 @@ fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_li
         return 0;
     }
 
-    if (depth == 1) return mvs.countMoves(board);
+    // if (depth == 1) return mvs.countMoves(board);
 
     var move_list = &move_lists[depth - 1];
     move_list.clear();

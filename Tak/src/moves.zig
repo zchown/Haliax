@@ -204,10 +204,8 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
             board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
         }
         zob.updateZobristHash(board, move);
-        board.addHashToHistory();
     }
     if (move.pattern == 0) {
-        board.clearHashHistory();
         const place_color = if (board.half_move_count < 2) board.to_move.opposite() else board.to_move;
 
         board.pushPieceToSquare(move.position, brd.Piece{
@@ -393,7 +391,6 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
         defer z.end();
     }
 
-    board.removeHashFromHistory();
 
     if (brd.do_road_uf) {
         board.supress_road_incremental = true;
