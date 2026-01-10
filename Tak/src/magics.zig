@@ -1,9 +1,6 @@
 const std = @import("std");
 const brd = @import("board");
 const tracy = @import("tracy");
-
-const tracy_enabled = tracy.build_options.enable_tracy;
-
 const gen = @import("magic_bitboards.zig");
 
 pub const slide_dir_masks: [brd.num_squares][4]brd.Bitboard = blk: {
@@ -33,10 +30,6 @@ pub fn slideReachable(board: *const brd.Board, pos: brd.Position) brd.Bitboard {
 }
 
 pub fn numSteps(board: *const brd.Board, pos: brd.Position, dir: brd.Direction) usize {
-    // if (tracy_enabled) {
-    //     const z = tracy.trace(@src());
-    //     defer z.end();
-    // }
     const reachable = slideReachable(board, pos);
     const dir_mask = slide_dir_masks[@as(usize, @intCast(pos))][@intFromEnum(dir)];
     return @as(usize, @intCast(@popCount(reachable & dir_mask)));

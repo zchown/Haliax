@@ -5,8 +5,6 @@ const zob = @import("zobrist");
 const magic = @import("magics");
 const tracy = @import("tracy");
 
-const tracy_enable = tracy.build_options.enable_tracy;
-
 pub const MoveList = struct {
     moves: []brd.Move,
     count: usize,
@@ -25,9 +23,6 @@ pub const MoveList = struct {
 
     pub fn deinit(self: *MoveList) void {
         self.allocator.free(self.moves);
-        self.moves = &[_]brd.Move{};
-        self.count = 0;
-        self.capacity = 0;
     }
 
     pub fn resize(self: *MoveList, new_capacity: usize) !void {
@@ -189,10 +184,10 @@ pub fn makeMoveWithCheck(board: *brd.Board, move: brd.Move) MoveError!void {
 }
 
 pub fn makeMove(board: *brd.Board, move: brd.Move) void {
-    if (tracy_enable) {
-        const z = tracy.trace(@src());
-        defer z.end();
-    }
+    const z = tracy.trace(@src());
+    defer z.end();
+
+    board.zobrist_hash ^= zob.zobrist_turn_hash;
 
     var did_crush: bool = false;
 
@@ -203,7 +198,7 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
             // std.debug.print("No crush move made\n", .{});
             board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
         }
-        zob.updateZobristHash(board, move);
+        // zob.updateZobristHash(board, move);
     }
     if (move.pattern == 0) {
         const place_color = if (board.half_move_count < 2) board.to_move.opposite() else board.to_move;
@@ -211,7 +206,7 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
         board.pushPieceToSquare(move.position, brd.Piece{
             .color = place_color,
             .stone_type = @enumFromInt(move.flag),
-        });
+        }, true);
 
         switch (@as(brd.StoneType, @enumFromInt(move.flag))) {
             .Flat => {
@@ -237,6 +232,12 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
             },
         }
 
+        board.zobrist_hash ^= 
+            zob.zobrist_table[@as(usize, @intCast(move.position))]
+            [@as(usize, @intCast(@intFromEnum(place_color)))]
+            [@as(usize, @intCast(move.flag))]
+            [board.squares[move.position].len - 1];
+
         return;
     }
 
@@ -257,6 +258,15 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
         }
     }
 
+    var cur_pos: brd.Position = move.position;
+
+    while (cur_pos != end_pos) {
+        zob.hashPosition(board, cur_pos);
+        cur_pos = brd.nextPosition(cur_pos, dir) orelse unreachable;
+    }
+    zob.hashPosition(board, end_pos);
+    cur_pos = move.position;
+
     // crush if needed
     if (board.squares[end_pos].top()) |stone| {
         if (stone.stone_type == brd.StoneType.Standing) {
@@ -268,7 +278,6 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
     }
 
     var started: bool = false;
-    var cur_pos: brd.Position = move.position;
     var stones_moved: usize = 0;
     const count = move.movedStones();
 
@@ -286,13 +295,18 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
         }
         const stack_index = board.squares[move.position].len - count + stones_moved;
         const to_move: brd.Piece = board.squares[move.position].stack[stack_index].?;
-        board.pushPieceToSquareNoUpdate(cur_pos, to_move);
+        board.pushPieceToSquare(cur_pos, to_move, false);
         stones_moved += 1;
     }
 
-    board.removePiecesFromSquareNoUpdate(move.position, stones_moved) catch unreachable;
+    board.removePiecesFromSquare(move.position, stones_moved, true) catch unreachable;
 
-    cur_pos = move.position;
+    cur_pos = end_pos;
+    while (cur_pos != move.position) {
+        zob.hashPosition(board, cur_pos);
+        cur_pos = brd.previousPosition(cur_pos, dir) orelse unreachable;
+    }
+    zob.hashPosition(board, move.position);
 }
 
 pub fn checkUndoMove(board: brd.Board, move: brd.Move) MoveError!void {
@@ -386,11 +400,10 @@ pub fn undoMoveWithCheck(board: *brd.Board, move: brd.Move) MoveError!void {
     undoMove(board, move);
 }
 pub fn undoMove(board: *brd.Board, move: brd.Move) void {
-    if (tracy_enable) {
-        const z = tracy.trace(@src());
-        defer z.end();
-    }
+    const z = tracy.trace(@src());
+    defer z.end();
 
+    board.zobrist_hash ^= zob.zobrist_turn_hash;
 
     if (brd.do_road_uf) {
         board.supress_road_incremental = true;
@@ -407,13 +420,13 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
     }
 
     if (move.pattern == 0) {
-        zob.updateZobristHash(board, move);
+        // zob.updateZobristHash(board, move);
         board.to_move = board.to_move.opposite();
         const top_stone = board.squares[move.position].top() orelse unreachable;
         const color = top_stone.color;
 
         const popped: brd.Piece = top_stone;
-        board.removePiecesFromSquareNoUpdate(move.position, 1) catch unreachable;
+        board.removePiecesFromSquare(move.position, 1, false) catch unreachable;
 
         switch (popped.stone_type) {
             .Flat => {
@@ -441,6 +454,12 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
             },
         }
 
+        board.zobrist_hash ^= 
+            zob.zobrist_table[@as(usize, @intCast(move.position))]
+            [@as(usize, @intCast(@intFromEnum(color)))]
+            [@as(usize, @intCast(@intFromEnum(popped.stone_type)))]
+            [board.squares[move.position].len];
+
         return;
     }
 
@@ -455,6 +474,13 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
     var piece_buffer: [8]brd.Piece = undefined;
     var piece_count: usize = 0;
 
+    while (cur_pos != move.position) {
+        zob.hashPosition(board, cur_pos);
+        cur_pos = brd.previousPosition(cur_pos, dir) orelse unreachable;
+    }
+    zob.hashPosition(board, move.position);
+    cur_pos = end_pos;
+
     // iterate backwards through pattern
     for (0..8) |i| {
 
@@ -465,7 +491,7 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
         const bit = (move.pattern >> @as(u3, @intCast(i))) & 0x1;
 
         const top_piece: brd.Piece = board.squares[cur_pos].stack[board.squares[cur_pos].len - 1] orelse unreachable;
-        board.removePiecesFromSquareNoUpdate(cur_pos, 1) catch unreachable;
+        board.removePiecesFromSquare(cur_pos, 1, false) catch unreachable;
         piece_buffer[piece_count] = top_piece;
         piece_count += 1;
 
@@ -475,7 +501,7 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
     }
 
     for (0..piece_count) |j| {
-        board.pushPieceToSquareNoUpdate(move.position, piece_buffer[piece_count - 1 - j]);
+        board.pushPieceToSquare(move.position, piece_buffer[piece_count - 1 - j], false);
     }
 
     if (board.crushMoves[(board.half_move_count - 1) % brd.crush_map_size] == .Crush) {
@@ -484,14 +510,19 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
 
     }
 
-    zob.updateZobristHash(board, move);
+    cur_pos = end_pos;
+    while (cur_pos != move.position) {
+        zob.hashPosition(board, cur_pos);
+        cur_pos = brd.previousPosition(cur_pos, dir) orelse unreachable;
+    }
+    zob.hashPosition(board, move.position);
+
+    // zob.updateZobristHash(board, move);
 }
 
 pub fn generateMoves(board: *const brd.Board, moves: *MoveList) !void {
-    if (tracy_enable) {
-        const z = tracy.trace(@src());
-        defer z.end();
-    }
+    // const z = tracy.trace(@src());
+    // defer z.end();
 
     if (board.half_move_count < 2) {
         for (0..brd.board_size * brd.board_size) |pos| {
@@ -512,10 +543,8 @@ pub fn generateMoves(board: *const brd.Board, moves: *MoveList) !void {
 }
 
 fn generatePlaceMoves(board: *const brd.Board, moves: *MoveList) !void {
-    if (tracy_enable) {
-        const z = tracy.trace(@src());
-        defer z.end();
-    }
+    // const z = tracy.trace(@src());
+    // defer z.end();
 
     const color: brd.Color = board.to_move;
     const stones_remaining = if (color == brd.Color.White) board.white_stones_remaining else board.black_stones_remaining;
@@ -546,10 +575,8 @@ fn generatePlaceMoves(board: *const brd.Board, moves: *MoveList) !void {
 }
 
 fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
-    if (tracy_enable) {
-        const z = tracy.trace(@src());
-        defer z.end();
-    }
+    // const z = tracy.trace(@src());
+    // defer z.end();
 
     const color: brd.Color = board.to_move;
     const color_bits = if (color == brd.Color.White) board.white_control else board.black_control;

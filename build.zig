@@ -103,7 +103,7 @@ pub fn build(b: *std.Build) void {
     move_generation_module.addImport("tracy", tracy_module);
 
     const exe = b.addExecutable(.{
-        .name = "Haliax",
+        .name = "HaliaxBase",
         .root_module = b.createModule(.{
             .root_source_file = b.path("Tak/main.zig"),
             .target = target,
@@ -158,14 +158,15 @@ pub fn build(b: *std.Build) void {
         exe.root_module.link_libc = true;
     }
 
-    const run_step = b.step("run", "Run the app");
-    const run_cmd = b.addRunArtifact(exe);
-    run_step.dependOn(&run_cmd.step);
-    run_cmd.step.dependOn(b.getInstallStep());
+    const run_lib = b.step("runlib", "Run the app");
+    const run_lib_cmd = b.addRunArtifact(exe);
+    run_lib.dependOn(&run_lib_cmd.step);
+    run_lib_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
-        run_cmd.addArgs(args);
+        run_lib_cmd.addArgs(args);
     }
 
+    
     const test_step = b.step("test", "Run all unit tests");
 
     const test_files = [_]struct { name: []const u8, path: []const u8 }{
@@ -223,5 +224,60 @@ pub fn build(b: *std.Build) void {
         individual_test_step.dependOn(&run_test.step);
 
     }
+
+    // const ab_transposition_module = b.createModule(.{
+    //     .root_source_file = b.path("Engine/AlphaBeta/transposition.zig"),
+    //     .target = target,
+    //     .optimize = optimize,
+    // });
+    //
+    // ab_transposition_module.addImport("zobrist", zobrist_module);
+    // ab_transposition_module.addImport("board", board_module);
+    //
+    // const engine = b.addExecutable(.{
+    //     .name = "Haliax",
+    //     .root_module = b.createModule(.{
+    //         .root_source_file = b.path("Engine/main.zig"),
+    //         .target = target,
+    //         .optimize = optimize,
+    //     }),
+    //     .use_llvm = true,
+    // });
+    //
+    // engine.root_module.addImport("board", board_module);
+    // engine.root_module.addImport("moves", moves_module);
+    // engine.root_module.addImport("ptn", ptn_module);
+    // engine.root_module.addImport("tps", tps_module);
+    // engine.root_module.addImport("zobrist", zobrist_module);
+    // engine.root_module.addImport("sympathy", sympathy_module);
+    // engine.root_module.addImport("tracy", tracy_module);
+    // engine.root_module.addImport("move_generation", move_generation_module);
+    //
+    // b.installArtifact(engine);
+    //
+    // const engine_options = b.addOptions();
+    // engine.root_module.addOptions("build_options", engine_options);
+    // engine_options.addOption(bool, "enable_tracy", tracy != null);
+    // engine_options.addOption(bool, "enable_tracy_callstack", tracy_callstack);
+    // engine_options.addOption(bool, "enable_tracy_allocation", tracy_allocation);
+    // engine_options.addOption(u32, "tracy_callstack_depth", tracy_callstack_depth);
+    //
+    // if (tracy) |tracy_path| {
+    //     const client_cpp = b.pathJoin(&[_][]const u8{ tracy_path, "public", "TracyClient.cpp" });
+    //     const tracy_c_flags: []const []const u8 = &.{ "-DTRACY_ENABLE=1", "-fno-sanitize=undefined" };
+    //
+    //     engine.root_module.addIncludePath(.{ .cwd_relative = tracy_path });
+    //     engine.root_module.addCSourceFile(.{ .file = .{ .cwd_relative = client_cpp }, .flags = tracy_c_flags });
+    //     engine.root_module.linkSystemLibrary("c++", .{ .use_pkg_config = .no });
+    //     engine.root_module.link_libc = true;
+    // }
+    //
+    // const run_step = b.step("run", "Run the app");
+    // const run_cmd = b.addRunArtifact(engine);
+    // run_step.dependOn(&run_cmd.step);
+    // run_cmd.step.dependOn(b.getInstallStep());
+    // if (b.args) |args| {
+    //     run_cmd.addArgs(args);
+    // }
 }
 

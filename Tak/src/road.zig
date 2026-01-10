@@ -2,7 +2,6 @@ const std = @import("std");
 const brd = @import("board");
 const zobrist = @import("zobrist");
 const tracy = @import("tracy");
-const tracy_enable = tracy.build_options.enable_tracy;
 
 // not doing path compression can be faster sometimes
 const do_compression = true;
@@ -63,10 +62,9 @@ pub const RoadUF = struct {
     }
 
     fn find(self: *RoadUF, i: usize) usize {
-        if (tracy_enable) {
-            const z = tracy.trace(@src());
-            defer z.end();
-        }
+        const z = tracy.trace(@src());
+        defer z.end();
+
         var x = i;
 
         // find
@@ -91,10 +89,9 @@ pub const RoadUF = struct {
     }
 
     fn unionUF(self: *RoadUF, a: usize, b: usize) void {
-        if (tracy_enable) {
-            const z = tracy.trace(@src());
-            defer z.end();
-        }
+        const z = tracy.trace(@src());
+        defer z.end();
+
         const ra = self.find(a);
         const rb = self.find(b);
         if (ra == rb) return;
@@ -132,10 +129,8 @@ pub const RoadUF = struct {
     }
 
     pub fn rebuildFromMask(self: *RoadUF, road_mask: brd.Bitboard) void {
-        if (tracy_enable) {
-            const z = tracy.trace(@src());
-            defer z.end();
-        }
+        const z = tracy.trace(@src());
+        defer z.end();
 
         self.clear();
 
@@ -173,10 +168,8 @@ pub const RoadUF = struct {
     }
 
     pub fn addPosIncremental(self: *RoadUF, pos: brd.Position, road_mask: brd.Bitboard) void {
-        if (tracy_enable) {
-            const z = tracy.trace(@src());
-            defer z.end();
-        }
+        const z = tracy.trace(@src());
+        defer z.end();
 
         const i: usize = @as(usize, @intCast(pos));
         if (self.active[i]) return;

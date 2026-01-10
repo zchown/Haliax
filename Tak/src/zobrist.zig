@@ -2,16 +2,14 @@ const std = @import("std");
 const brd = @import("board");
 const tracy = @import("tracy");
 
-const tracy_enabled = tracy.build_options.enable_tracy;
-
 pub const ZobristHash = u64;
 
-const zobrist_table: [brd.num_squares][brd.num_colors][brd.num_piece_types][brd.zobrist_stack_depth]ZobristHash = blk: {
+pub const zobrist_table: [brd.num_squares][brd.num_colors][brd.num_piece_types][brd.zobrist_stack_depth]ZobristHash = blk: {
     @setEvalBranchQuota(1000000);
     break :blk initZobristTable();
 };
 
-const zobrist_turn_hash: ZobristHash = blk: {
+pub const zobrist_turn_hash: ZobristHash = blk: {
     var seed: u64 = 0xFEDCBA0987654321;
     break :blk splitMix64(&seed);
 };
@@ -103,4 +101,23 @@ fn updateSinglePositionHash(board:
         .Black => 1,
     };
     board.zobrist_hash ^= zobrist_table[pos][color][piece_type][depth];
+}
+
+pub fn hashPosition(board: *brd.Board, pos: brd.Position) void {
+    const square = &board.squares[pos];
+    if (square.len == 0) return;
+
+    for (0..square.len) |i| {
+        const piece = square.stack[i].?;
+        const piece_type: usize = switch (piece.stone_type) {
+            .Flat => 0,
+            .Standing => 1,
+            .Capstone => 2,
+        };
+        const color: usize = switch (piece.color) {
+            .White => 0,
+            .Black => 1,
+        };
+        board.zobrist_hash ^= zobrist_table[pos][color][piece_type][i];
+    }
 }

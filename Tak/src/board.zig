@@ -2,7 +2,6 @@ const std = @import("std");
 const zob = @import("zobrist");
 const road = @import("road");
 const tracy = @import("tracy");
-const tracy_enable = tracy.build_options.enable_tracy;
 
 pub const board_size = 6;
 pub const num_squares = board_size * board_size;
@@ -373,10 +372,8 @@ pub const Board = struct {
     }
 
     pub fn checkResult(self: *Board) Result {
-        if (tracy_enable) {
-            const z = tracy.trace(@src());
-            defer z.end();
-        }
+        // const z = tracy.trace(@src());
+        // defer z.end();
 
         self.updateResult();
         return self.game_status;
@@ -423,10 +420,8 @@ pub const Board = struct {
     }
 
     fn checkRoadWinUF(self: *Board) void {
-        if (tracy_enable) {
-            const z = tracy.trace(@src());
-            defer z.end();
-        }
+        // const z = tracy.trace(@src());
+        // defer z.end();
 
         const current: Color = self.to_move.opposite();
         const opponent: Color = self.to_move;
@@ -455,10 +450,8 @@ pub const Board = struct {
     }
 
     fn checkRoadWin(self: *Board) void {
-        if (tracy_enable) {
-            const z = tracy.trace(@src());
-            defer z.end();
-        }
+        // const z = tracy.trace(@src());
+        // defer z.end();
 
         const current: Color = self.to_move.opposite();
         const opponent: Color = self.to_move;
@@ -502,10 +495,8 @@ pub const Board = struct {
     }
 
     fn hasRoad(player_controlled: Bitboard, search_dir: SearchDirection) bool {
-        if (tracy_enable) {
-            const z = tracy.trace(@src());
-            defer z.end();
-        }
+        // const z = tracy.trace(@src());
+        // defer z.end();
 
         const start_mask: Bitboard = if (search_dir == .Vertical) row_masks[board_size - 1] else column_masks[0];
         const end_mask: Bitboard = if (search_dir == .Vertical) row_masks[0] else column_masks[board_size - 1];
@@ -671,30 +662,10 @@ pub const Board = struct {
         }
     }
 
-    pub fn pushPieceToSquareNoUpdate(self: *Board, pos: Position, piece: Piece) void {
-        self.squares[pos].pushPiece(piece);
-        // update bitboards
-        clearBit(&self.empty_squares, pos);
-        clearBit(&self.standing_stones, pos);
-        clearBit(&self.capstones, pos);
-        clearBit(&self.white_control, pos);
-        clearBit(&self.black_control, pos);
-        if (piece.stone_type == .Standing) {
-            setBit(&self.standing_stones, pos);
-        } else if (piece.stone_type == .Capstone) {
-            setBit(&self.capstones, pos);
-        }
-        if (piece.color == .White) {
-            setBit(&self.white_control, pos);
-        } else {
-            setBit(&self.black_control, pos);
-        }
-    }
-
-    pub fn pushPieceToSquare(self: *Board, pos: Position, piece: Piece) void {
+    pub fn pushPieceToSquare(self: *Board, pos: Position, piece: Piece, update: bool) void {
         var old_top_piece: ?Piece = null;
 
-        if (do_road_uf) {
+        if (do_road_uf and update) {
             old_top_piece = self.squares[pos].top();
         }
 
@@ -716,42 +687,16 @@ pub const Board = struct {
             setBit(&self.black_control, pos);
         }
 
-        if (do_road_uf) {
+        if (do_road_uf and update) {
             self.onTopPieceChanged(pos, old_top_piece, self.squares[pos].top());
         }
     }
 
-    pub fn removePiecesFromSquareNoUpdate(self: *Board, pos: Position, count: usize) !void {
-        const square = &self.squares[pos];
-
-        clearBit(&self.white_control, pos);
-        clearBit(&self.black_control, pos);
-        clearBit(&self.standing_stones, pos);
-        clearBit(&self.capstones, pos);
-
-        try square.removePieces(count);
-        if (square.len == 0) {
-            setBit(&self.empty_squares, pos);
-        } else {
-            const top_piece = square.top().?;
-            if (top_piece.stone_type == .Standing) {
-                setBit(&self.standing_stones, pos);
-            } else if (top_piece.stone_type == .Capstone) {
-                setBit(&self.capstones, pos);
-            }
-            if (top_piece.color == .White) {
-                setBit(&self.white_control, pos);
-            } else {
-                setBit(&self.black_control, pos);
-            }
-        }
-    }
-
-    pub fn removePiecesFromSquare(self: *Board, pos: Position, count: usize) !void {
+    pub fn removePiecesFromSquare(self: *Board, pos: Position, count: usize, update: bool) !void {
         const square = &self.squares[pos];
         var old_top_piece: ?Piece = null;
 
-        if (do_road_uf) {
+        if (do_road_uf and update) {
             old_top_piece = square.top();
         }
 
@@ -776,7 +721,8 @@ pub const Board = struct {
                 setBit(&self.black_control, pos);
             }
         }
-        if (!do_road_uf) {
+
+        if (do_road_uf and update) {
             self.onTopPieceChanged(pos, old_top_piece, square.top());
         }
     }

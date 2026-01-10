@@ -6,8 +6,6 @@ const ptn = @import("ptn");
 const gen = @import("move_generation");
 const tracy = @import("tracy");
 
-const tracy_enable = tracy.build_options.enable_tracy;
-
 const mode = @import("builtin").mode;
 
 fn mnpsFromNs(nodes: u64, elapsed_ns: u64) f64 {
@@ -20,11 +18,8 @@ fn mnpsFromNs(nodes: u64, elapsed_ns: u64) f64 {
 }
 
 pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []const u8) !void {
-    if (tracy_enable) {
-        const tr = tracy.trace(@src());
-        defer tr.end();
-    }
-
+    const tr = tracy.trace(@src());
+    defer tr.end();
 
     var total_nodes: u64 = 0;
 
@@ -44,8 +39,8 @@ pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []c
         var board = try tps.parseTPS(tps_string);
         var depth_timer = try std.time.Timer.start();
 
-        const nodes_usize = try perft(allocator, &board, depth, move_lists);
-        // const nodes_usize = try perftGenerator(allocator, &board, depth);
+        // const nodes_usize = try perft(allocator, &board, depth, move_lists);
+        const nodes_usize = try perftGenerator(allocator, &board, depth);
         const nodes: u64 = @intCast(nodes_usize);
 
         const depth_ns = depth_timer.read();
@@ -82,17 +77,17 @@ fn perftGenerator(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize
         return 0;
     }
 
-    // if (depth == 1) return mvs.countMoves(board);
+    if (depth == 1) return mvs.countMoves(board);
 
     var generator = gen.MoveGenerator.initDefault(board);
 
-    if (depth == 1) {
-        var count: usize = 0;
-        while (generator.next()) |_| {
-            count += 1;
-        }
-        return count;
-    }
+    // if (depth == 1) {
+    //     var count: usize = 0;
+    //     while (generator.next()) |_| {
+    //         count += 1;
+    //     }
+    //     return count;
+    // }
 
     while (generator.next()) |move| {
         // std.debug.print("Perft depth {d}: considering move {b}\n", .{depth, move.pattern});
