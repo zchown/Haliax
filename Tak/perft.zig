@@ -8,7 +8,7 @@ const tracy = @import("tracy");
 
 const mode = @import("builtin").mode;
 
-fn mnpsFromNs(nodes: u64, elapsed_ns: u64) f64 {
+inline fn mnpsFromNs(nodes: u64, elapsed_ns: u64) f64 {
     if (elapsed_ns == 0) return 0.0;
 
     const nodes_f = @as(f64, @floatFromInt(nodes));
@@ -18,7 +18,7 @@ fn mnpsFromNs(nodes: u64, elapsed_ns: u64) f64 {
 }
 
 pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []const u8) !void {
-    const tr = tracy.trace(@src());
+    const tr = tracy.traceNamed(@src(), "Perft Run");
     defer tr.end();
 
     var total_nodes: u64 = 0;
@@ -64,16 +64,22 @@ pub fn runPerft(allocator: *std.mem.Allocator, max_depth: usize, tps_string: []c
     std.debug.print("Total time: {d}ms\n", .{total_ns / std.time.ns_per_ms});
     std.debug.print("Average speed: {d:.2} MNPS\n", .{avg_mnps});
     std.debug.print("==============================\n\n\n\n", .{});
+    return;
 }
 
 fn perftGenerator(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize) !usize {
+    const z = tracy.trace(@src());
+    defer z.end();
+
     var nodes: usize = 0;
 
     // if (depth == 0) {
+    //     _ = board.checkResult();
     //     return 1;
     // }
 
     if (board.checkResult().ongoing != 1) {
+        // std.debug.print("Game over detected at depth {d}\n", .{depth});
         return 0;
     }
 
@@ -132,12 +138,12 @@ fn perftGenerator(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize
                 std.debug.print("Current TPS: {s}\n", .{tps_str});
                 std.debug.print("Expected TPS: {s}\n", .{pre_tps});
                 std.debug.print("Post-move TPS: {s}\n", .{post_tps});
-
+        
                 const move_ptn = try ptn.moveToString(allocator, move, board.to_move);
                 defer allocator.free(move_ptn);
                 std.debug.print("Offending move: {s}\n", .{move_ptn});
                 std.debug.print("Move pattern: {b}\n", .{move.pattern});
-
+        
                 return error.TPSMismatch;
             }
             if (pre_hash != board.zobrist_hash) {
@@ -164,6 +170,9 @@ fn perftGenerator(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize
 }
 
 fn perft(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize, move_lists: []mvs.MoveList) !usize {
+    const z = tracy.trace(@src());
+    defer z.end();
+
     var nodes: usize = 0;
 
     if (board.checkResult().ongoing != 1) {

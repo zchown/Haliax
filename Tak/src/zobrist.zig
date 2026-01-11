@@ -88,7 +88,7 @@ pub fn updateZobristHash(board: *brd.Board, move: brd.Move) void {
     }
 }
 
-fn updateSinglePositionHash(board: 
+inline fn updateSinglePositionHash(board: 
     *brd.Board, pos: brd.Position, piece: brd.Piece, depth: usize) void {
 
     const piece_type: usize = switch (piece.stone_type) {
@@ -103,11 +103,14 @@ fn updateSinglePositionHash(board:
     board.zobrist_hash ^= zobrist_table[pos][color][piece_type][depth];
 }
 
-pub fn hashPosition(board: *brd.Board, pos: brd.Position) void {
+pub inline fn hashPosition(board: *brd.Board, pos: brd.Position) void {
     const square = &board.squares[pos];
     if (square.len == 0) return;
 
-    for (0..square.len) |i| {
+    const max_depth = if (square.len > brd.zobrist_stack_depth) square.len - brd.zobrist_stack_depth else 0;
+
+    var j:usize = 0;
+    for (max_depth..square.len - 1) |i| {
         const piece = square.stack[i].?;
         const piece_type: usize = switch (piece.stone_type) {
             .Flat => 0,
@@ -118,6 +121,7 @@ pub fn hashPosition(board: *brd.Board, pos: brd.Position) void {
             .White => 0,
             .Black => 1,
         };
-        board.zobrist_hash ^= zobrist_table[pos][color][piece_type][i];
+        board.zobrist_hash ^= zobrist_table[pos][color][piece_type][j];
+        j += 1;
     }
 }

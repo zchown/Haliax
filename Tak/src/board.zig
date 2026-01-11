@@ -1,6 +1,7 @@
 const std = @import("std");
 const zob = @import("zobrist");
 const road = @import("road");
+const vb = @import("vector_board");
 const tracy = @import("tracy");
 
 pub const board_size = 6;
@@ -21,6 +22,7 @@ pub const crush_map_size = 256;
 // alternative is flood fill bitboard method
 // slower for 6x6 but might have benefits for eval
 pub const do_road_uf = false;
+pub const do_vector_board = true;
 
 pub const StoneType = enum(u2) {
     Flat,
@@ -182,6 +184,7 @@ pub const Square = struct {
             .White => self.white_count += 1,
             .Black => self.black_count += 1,
         }
+        return;
     }
 
     pub inline fn removePieces(self: *Square, count: usize) !void {
@@ -265,7 +268,7 @@ pub const Move = packed struct(u16) {
     }
 };
 
-pub fn movesEqual(a: Move, b: Move) bool {
+pub inline fn movesEqual(a: Move, b: Move) bool {
     return a.position == b.position and
         a.flag == b.flag and
         a.pattern == b.pattern;
@@ -306,6 +309,9 @@ pub const Board = struct {
     road_dirty_black: bool,
     supress_road_incremental: bool,
 
+    white_vector: vb.BoardState,
+    black_vector: vb.BoardState,
+
     pub fn init() Board {
         var brd = Board{
             .squares = [_]Square{Square.init()} ** 36,
@@ -333,6 +339,8 @@ pub const Board = struct {
             .road_dirty_white = false,
             .road_dirty_black = false,
             .supress_road_incremental = false,
+            .white_vector = vb.BoardState.init(.White),
+            .black_vector = vb.BoardState.init(.Black),
         };
 
         zob.computeZobristHash(&brd);
@@ -364,22 +372,53 @@ pub const Board = struct {
         self.road_dirty_white = false;
         self.road_dirty_black = false;
         self.supress_road_incremental = false;
+        self.white_vector.clear();
+        self.black_vector.clear();
         zob.computeZobristHash(self);
     }
 
-    pub fn equals(self: *const Board, other: *const Board) bool {
+    pub fn recomputeSquareVector(self: *Board, pos: Position) void {
+        if (!do_vector_board) return;
+        self.white_vector.recomputeSquare(self, pos);
+        self.black_vector.recomputeSquare(self, pos);
+    }
+
+    pub fn recomputeReservesVector(self: *Board) void {
+        if (!do_vector_board) return;
+        self.white_vector.recomputeReserves(self);
+        self.black_vector.recomputeReserves(self);
+    }
+
+    pub fn placeMoveUpdateVectors(self: *Board, pos: Position, p: Piece) void {
+        if (!do_vector_board) return;
+        self.white_vector.placeMoveUpdate(pos, p);
+        self.black_vector.placeMoveUpdate(pos, p);
+        self.recomputeReservesVector();
+    }
+
+    pub fn placeMoveUndoVectors(self: *Board, pos: Position) void {
+        if (!do_vector_board) return;
+        self.white_vector.placeMoveUndo(pos);
+        self.black_vector.placeMoveUndo(pos);
+        self.recomputeReservesVector();
+    }
+
+    pub inline fn equals(self: *const Board, other: *const Board) bool {
         return self.zobrist_hash == other.zobrist_hash;
     }
 
     pub fn checkResult(self: *Board) Result {
-        // const z = tracy.trace(@src());
-        // defer z.end();
+        const z = tracy.trace(@src());
+        defer z.end();
 
         self.updateResult();
         return self.game_status;
     }
 
     fn updateResult(self: *Board) void {
+        const z = tracy.trace(@src());
+        defer z.end();
+
         const whites = self.white_stones_remaining + self.white_capstones_remaining;
         const blacks = self.black_stones_remaining + self.black_capstones_remaining;
 
@@ -417,11 +456,12 @@ pub const Board = struct {
                 self.checkRoadWin();
             }
         }
+        return;
     }
 
     fn checkRoadWinUF(self: *Board) void {
-        // const z = tracy.trace(@src());
-        // defer z.end();
+        const z = tracy.trace(@src());
+        defer z.end();
 
         const current: Color = self.to_move.opposite();
         const opponent: Color = self.to_move;
@@ -450,8 +490,8 @@ pub const Board = struct {
     }
 
     fn checkRoadWin(self: *Board) void {
-        // const z = tracy.trace(@src());
-        // defer z.end();
+        const z = tracy.trace(@src());
+        defer z.end();
 
         const current: Color = self.to_move.opposite();
         const opponent: Color = self.to_move;
@@ -492,11 +532,12 @@ pub const Board = struct {
             .color = 0,
             .ongoing = 1,
         };
+        return;
     }
 
     fn hasRoad(player_controlled: Bitboard, search_dir: SearchDirection) bool {
-        // const z = tracy.trace(@src());
-        // defer z.end();
+        const z = tracy.trace(@src());
+        defer z.end();
 
         const start_mask: Bitboard = if (search_dir == .Vertical) row_masks[board_size - 1] else column_masks[0];
         const end_mask: Bitboard = if (search_dir == .Vertical) row_masks[0] else column_masks[board_size - 1];
@@ -574,7 +615,7 @@ pub const Board = struct {
         self.road_dirty_black = true;
     }
 
-    fn roadMaskForColor(self: *Board, color: Color) Bitboard {
+    inline fn roadMaskForColor(self: *Board, color: Color) Bitboard {
         var controlled: Bitboard = 0;
         if (color == .White) {
             controlled = self.white_control;
@@ -584,7 +625,7 @@ pub const Board = struct {
         return controlled & ~self.standing_stones;
     }
 
-    fn ensureRoadUpToDate(self: *Board, color: Color) void {
+    inline fn ensureRoadUpToDate(self: *Board, color: Color) void {
         if (color == .White) {
             if (!self.road_dirty_white) return;
             const road_mask = self.roadMaskForColor(.White);
@@ -618,6 +659,10 @@ pub const Board = struct {
     }
 
     pub fn onTopPieceChanged(self: *Board, pos: Position, old_piece: ?Piece, new_piece: ?Piece) void {
+
+        const trace = tracy.trace(@src());
+        defer trace.end();
+
         const old_color = roadTopColor(old_piece);
         const new_color = roadTopColor(new_piece);
 
@@ -654,6 +699,9 @@ pub const Board = struct {
     }
 
     fn hasRoadUF(self: *Board, color: Color) bool {
+        const z = tracy.trace(@src());
+        defer z.end();
+
         self.ensureRoadUpToDate(color);
         if (color == .White) {
             return self.white_road_uf.has_road_h or self.white_road_uf.has_road_v;
@@ -663,6 +711,9 @@ pub const Board = struct {
     }
 
     pub fn pushPieceToSquare(self: *Board, pos: Position, piece: Piece, update: bool) void {
+        const z = tracy.trace(@src());
+        defer z.end();
+
         var old_top_piece: ?Piece = null;
 
         if (do_road_uf and update) {
@@ -690,9 +741,13 @@ pub const Board = struct {
         if (do_road_uf and update) {
             self.onTopPieceChanged(pos, old_top_piece, self.squares[pos].top());
         }
+        return;
     }
 
     pub fn removePiecesFromSquare(self: *Board, pos: Position, count: usize, update: bool) !void {
+        const z = tracy.trace(@src());
+        defer z.end();
+
         const square = &self.squares[pos];
         var old_top_piece: ?Piece = null;
 
@@ -725,6 +780,7 @@ pub const Board = struct {
         if (do_road_uf and update) {
             self.onTopPieceChanged(pos, old_top_piece, square.top());
         }
+        return;
     }
 
     pub fn recountReserves(self: *Board) void {
@@ -815,11 +871,11 @@ pub inline fn nextPosition(pos: Position, dir: Direction) ?Position {
     }
 }
 
-pub fn previousPosition(pos: Position, dir: Direction) ?Position {
+pub inline fn previousPosition(pos: Position, dir: Direction) ?Position {
     return nextPosition(pos, opositeDirection(dir));
 }
 
-pub fn nthPositionFrom(pos: Position, dir: Direction, n: usize) ?Position {
+pub inline fn nthPositionFrom(pos: Position, dir: Direction, n: usize) ?Position {
     const bs_u: usize = board_size;
     const pos_u: usize = @intCast(pos);
 
@@ -844,7 +900,7 @@ pub fn nthPositionFrom(pos: Position, dir: Direction, n: usize) ?Position {
     }
 }
 
-pub fn bbGetNthPositionFrom(bb: Bitboard, dir: Direction, n: usize) Bitboard {
+pub inline fn bbGetNthPositionFrom(bb: Bitboard, dir: Direction, n: usize) Bitboard {
     var result: Bitboard = bb;
 
     for (0..n) |_| {

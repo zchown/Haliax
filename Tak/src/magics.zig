@@ -16,7 +16,7 @@ pub const slide_dir_masks: [brd.num_squares][4]brd.Bitboard = blk: {
     break :blk arr;
 };
 
-pub fn slideReachable(board: *const brd.Board, pos: brd.Position) brd.Bitboard {
+pub inline fn slideReachable(board: *const brd.Board, pos: brd.Position) brd.Bitboard {
     const blockers: brd.Bitboard = (board.standing_stones | board.capstones);
 
     const sq: usize = @as(usize, @intCast(pos));
@@ -30,6 +30,9 @@ pub fn slideReachable(board: *const brd.Board, pos: brd.Position) brd.Bitboard {
 }
 
 pub fn numSteps(board: *const brd.Board, pos: brd.Position, dir: brd.Direction) usize {
+    const tr = tracy.trace(@src());
+    defer tr.end();
+
     const reachable = slideReachable(board, pos);
     const dir_mask = slide_dir_masks[@as(usize, @intCast(pos))][@intFromEnum(dir)];
     return @as(usize, @intCast(@popCount(reachable & dir_mask)));

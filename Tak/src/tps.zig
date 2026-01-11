@@ -7,6 +7,8 @@ const Piece = brd.Piece;
 const Color = brd.Color;
 const StoneType = brd.StoneType;
 const Position = brd.Position;
+const tracy = @import("tracy");
+
 const board_size = brd.board_size;
 
 pub const TPSError = error{
@@ -18,6 +20,9 @@ pub const TPSError = error{
 };
 
 pub fn parseTPS(tps: []const u8) !Board {
+    const z = tracy.trace(@src());
+    defer z.end();
+
     var b = Board.init();
 
     var tps_str = tps;
@@ -66,6 +71,9 @@ pub fn parseTPS(tps: []const u8) !Board {
 }
 
 fn parseRow(b: *Board, row_str: []const u8, row_num: usize) !void {
+    const z = tracy.trace(@src());
+    defer z.end();
+
     var col_iter = std.mem.splitScalar(u8, row_str, ',');
     var col_number: usize = 0;
 
@@ -96,6 +104,9 @@ fn parseRow(b: *Board, row_str: []const u8, row_num: usize) !void {
 }
 
 fn parseStack(b: *Board, pos: Position, token: []const u8) !void {
+    const z = tracy.trace(@src());
+    defer z.end();
+
     var sq = &b.squares[pos];
     var i: usize = 0;
 
@@ -129,6 +140,9 @@ fn parseStack(b: *Board, pos: Position, token: []const u8) !void {
 }
 
 fn updateBoardState(b: *Board) !void {
+    const z = tracy.trace(@src());
+    defer z.end();
+
     b.white_control = 0;
     b.black_control = 0;
     b.empty_squares = 0;
@@ -189,6 +203,9 @@ fn updateBoardState(b: *Board) !void {
 }
 
 pub fn boardToTPS(allocator: std.mem.Allocator, b: *const Board) ![]u8 {
+    const z = tracy.trace(@src());
+    defer z.end();
+
     var buffer = try std.ArrayList(u8).initCapacity(allocator, 128);
     errdefer buffer.deinit(allocator);
     const writer = buffer.writer(allocator);

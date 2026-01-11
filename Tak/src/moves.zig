@@ -26,6 +26,9 @@ pub const MoveList = struct {
     }
 
     pub fn resize(self: *MoveList, new_capacity: usize) !void {
+        const z = tracy.trace(@src());
+        defer z.end();
+
         const new_moves = try self.allocator.alloc(brd.Move, new_capacity);
         std.mem.copyForwards(brd.Move, new_moves[0..self.count], self.moves[0..self.count]);
         self.allocator.free(self.moves);
@@ -34,6 +37,9 @@ pub const MoveList = struct {
     }
 
     pub fn append(self: *MoveList, move: brd.Move) !void {
+        const z = tracy.trace(@src());
+        defer z.end();
+
         if (self.count >= self.capacity) {
             try self.resize(self.capacity * 2);
         }
@@ -202,11 +208,11 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
     }
     if (move.pattern == 0) {
         const place_color = if (board.half_move_count < 2) board.to_move.opposite() else board.to_move;
-
-        board.pushPieceToSquare(move.position, brd.Piece{
+        const to_place = brd.Piece{
             .color = place_color,
             .stone_type = @enumFromInt(move.flag),
-        }, true);
+        };
+        board.pushPieceToSquare(move.position, to_place, true);
 
         switch (@as(brd.StoneType, @enumFromInt(move.flag))) {
             .Flat => {
@@ -237,6 +243,7 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
             [@as(usize, @intCast(@intFromEnum(place_color)))]
             [@as(usize, @intCast(move.flag))]
             [board.squares[move.position].len - 1];
+        board.placeMoveUpdateVectors(move.position, to_place);
 
         return;
     }
@@ -304,9 +311,12 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
     cur_pos = end_pos;
     while (cur_pos != move.position) {
         zob.hashPosition(board, cur_pos);
+        board.recomputeSquareVector(cur_pos);
         cur_pos = brd.previousPosition(cur_pos, dir) orelse unreachable;
     }
     zob.hashPosition(board, move.position);
+    board.recomputeSquareVector(move.position);
+    return;
 }
 
 pub fn checkUndoMove(board: brd.Board, move: brd.Move) MoveError!void {
@@ -459,6 +469,7 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
             [@as(usize, @intCast(@intFromEnum(color)))]
             [@as(usize, @intCast(@intFromEnum(popped.stone_type)))]
             [board.squares[move.position].len];
+        board.placeMoveUndoVectors(move.position);
 
         return;
     }
@@ -513,16 +524,19 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
     cur_pos = end_pos;
     while (cur_pos != move.position) {
         zob.hashPosition(board, cur_pos);
+        board.recomputeSquareVector(cur_pos);
         cur_pos = brd.previousPosition(cur_pos, dir) orelse unreachable;
     }
     zob.hashPosition(board, move.position);
+    board.recomputeSquareVector(move.position);
 
     // zob.updateZobristHash(board, move);
+    return;
 }
 
 pub fn generateMoves(board: *const brd.Board, moves: *MoveList) !void {
-    // const z = tracy.trace(@src());
-    // defer z.end();
+    const z = tracy.trace(@src());
+    defer z.end();
 
     if (board.half_move_count < 2) {
         for (0..brd.board_size * brd.board_size) |pos| {
@@ -633,6 +647,8 @@ fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
 }
 
 pub fn countMoves(board: *const brd.Board) !usize {
+    const z = tracy.trace(@src());
+    defer z.end();
 
     if (board.half_move_count < 2) {
         return @popCount(board.empty_squares);
@@ -646,6 +662,9 @@ pub fn countMoves(board: *const brd.Board) !usize {
 }
 
 fn countPlaceMoves(board: *const brd.Board) usize {
+    const z = tracy.trace(@src());
+    defer z.end();
+
     const color: brd.Color = board.to_move;
     const stones_remaining = if (color == brd.Color.White) board.white_stones_remaining else board.black_stones_remaining;
     const capstone_remaining = if (color == brd.Color.White) board.white_capstones_remaining else board.black_capstones_remaining;
@@ -660,6 +679,9 @@ fn countPlaceMoves(board: *const brd.Board) usize {
 }
 
 fn countSlideMoves(board: *const brd.Board) !usize {
+    const z = tracy.trace(@src());
+    defer z.end();
+
     const color: brd.Color = board.to_move;
     const color_bits = if (color == brd.Color.White) board.white_control else board.black_control;
 

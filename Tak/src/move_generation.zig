@@ -127,8 +127,8 @@ pub const MoveGenerator = struct {
     }
 
     pub fn next(self: *MoveGenerator) ?brd.Move {
-        // const tr = tracy.trace(@src());
-        // defer tr.end();
+        const tr = tracy.trace(@src());
+        defer tr.end();
 
         if (self.state.doing_place) {
             if (self.nextPlace()) |mv| return mv;
@@ -148,8 +148,8 @@ pub const MoveGenerator = struct {
     }
 
     fn nextPlace(self: *MoveGenerator) ?brd.Move {
-        // const tr = tracy.trace(@src());
-        // defer tr.end();
+        const tr = tracy.trace(@src());
+        defer tr.end();
 
         if (self.state.place_cur_index < self.state.place_move_count) {
             const mv = self.state.place_moves[self.state.place_cur_index];
@@ -160,8 +160,8 @@ pub const MoveGenerator = struct {
     }
 
     fn nextSlide(self: *MoveGenerator) ?brd.Move {
-        // const tr = tracy.trace(@src());
-        // defer tr.end();
+        const tr = tracy.trace(@src());
+        defer tr.end();
 
         while (true) {
             if (self.state.pattern) |plist_ptr| {
@@ -182,8 +182,8 @@ pub const MoveGenerator = struct {
     }
 
     fn generatePlaceMoves(self: *MoveGenerator) void {
-        // const tr = tracy.trace(@src());
-        // defer tr.end();
+        const tr = tracy.trace(@src());
+        defer tr.end();
 
         self.state.place_move_count = 0;
         self.state.place_cur_index = 0;
@@ -235,6 +235,9 @@ pub const MoveGenerator = struct {
     }
 
     fn advanceSlideSource(self: *MoveGenerator) bool {
+        const tr = tracy.trace(@src());
+        defer tr.end();
+
         while (true) {
             if (!self.state.pos_active) {
                 if (!self.popNextControlled()) return false;
@@ -258,6 +261,9 @@ pub const MoveGenerator = struct {
     }
 
     fn popNextControlled(self: *MoveGenerator) bool {
+        const tr = tracy.trace(@src());
+        defer tr.end();
+
         var bb = self.state.controlled_remaining;
         if (bb == 0) return false;
 
@@ -269,8 +275,8 @@ pub const MoveGenerator = struct {
     }
 
     fn cacheSlidePosData(self: *MoveGenerator) void {
-        // const tr = tracy.trace(@src());
-        // defer tr.end();
+        const tr = tracy.trace(@src());
+        defer tr.end();
 
         const pos = self.state.current_pos;
         const sq_len: usize = self.board.squares[pos].len;
@@ -281,8 +287,8 @@ pub const MoveGenerator = struct {
     }
 
     fn computePatternForCurrent(self: *MoveGenerator) bool {
-        // const tr = tracy.trace(@src());
-        // defer tr.end();
+        const tr = tracy.trace(@src());
+        defer tr.end();
 
         self.state.pattern = null;
         self.state.pattern_index = 0;
