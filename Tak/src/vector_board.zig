@@ -11,6 +11,8 @@ const opp_below_layer_offset: usize = 12 * brd.board_size * brd.board_size;
 const my_reserve_layer_offset: usize = 18 * brd.board_size * brd.board_size;
 const opp_reserve_layer_offset: usize = 20 * brd.board_size * brd.board_size;
 
+const flat_differential_offset: usize = 22 * brd.board_size * brd.board_size;
+
 pub const BoardState = struct {
     perspective: brd.Color, // Perspective of the player to move
                             // Computed based on indicatedplayers perspective
@@ -22,7 +24,7 @@ pub const BoardState = struct {
     pub fn init(perspective: brd.Color) BoardState {
         return BoardState{
             .perspective = perspective,
-            .data = [_]f32{0} ** (brd.board_size * brd.board_size * (6 + 12 + 4)),
+            .data = [_]f32{0} ** (brd.board_size * brd.board_size * (6 + 12 + 4 + 1)),
         };
     }
 
@@ -145,5 +147,27 @@ pub const BoardState = struct {
         self.data[opp_top_layer_offset + pos] = 0;
         self.data[opp_top_layer_offset + pos + 1] = 0;
         self.data[opp_top_layer_offset + pos + 2] = 0;
+    }
+
+    pub fn update_flat_differential(self: *BoardState, board: brd.Board) void {
+        var my_flat_count: f32 = 0;
+        var opp_flat_count: f32 = 0;
+
+        const white_flats: brd.Bitboard = (board.white_control & ~board.standing_stones) & ~board.capstones;
+        const black_flats: brd.Bitboard = (board.black_control & ~board.standing_stones) & ~board.capstones;
+
+        if (self.perspective == .White) {
+            my_flat_count = board.white_stones_remaining + @as(f32, @floatFromInt(white_flats.count()));
+            opp_flat_count = board.black_stones_remaining + @as(f32, @floatFromInt(black_flats.count()));
+            opp_flat_count += brd.komi;
+        } else {
+            my_flat_count = board.black_stones_remaining + @as(f32, @floatFromInt(black_flats.count()));
+            opp_flat_count = board.white_stones_remaining + @as(f32, @floatFromInt(white_flats.count()));
+            my_flat_count += brd.komi;
+        }
+        const flat_diff = my_flat_count - opp_flat_count;
+        for (0..brd.num_squares) |pos| {
+            self.data[flat_differential_offset + pos] = flat_diff;
+        }
     }
 };
