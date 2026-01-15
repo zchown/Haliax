@@ -4,6 +4,7 @@ const zob = @import("zobrist");
 const tracy = @import("tracy");
 const mvs = @import("moves");
 const ptn = @import("ptn");
+const tps = @import("tps");
 
 pub const cpuct: f32 = 1.0;
 
@@ -48,6 +49,7 @@ pub const MonteCarloTreeSearch = struct {
     eval_fn: EvalFn,
 
     move_list: mvs.MoveList,
+    made_move_list: mvs.MoveList,
 
     arena: std.heap.ArenaAllocator,
     node_map: std.AutoHashMap(zob.ZobristHash, *Node),
@@ -62,6 +64,7 @@ pub const MonteCarloTreeSearch = struct {
             .allocator = alloc,
             .eval_fn = eval_fn,
             .move_list = try mvs.MoveList.init(alloc, 512),
+            .made_move_list = try mvs.MoveList.init(alloc, 512),
             .arena = arena,
             .node_map = std.AutoHashMap(zob.ZobristHash, *Node).init(arena.allocator()),
             .debug_mode = dm,
@@ -259,7 +262,11 @@ pub const MonteCarloTreeSearch = struct {
             path_edges[depth] = ei;
             depth += 1;
 
+            self.move_list.clear();
+            try mvs.generateMoves(board, &self.move_list);
+
             mvs.makeMove(board, mv);
+            try self.made_move_list.append(mv);
 
             const child_hash = board.zobrist_hash;
             const child = try self.getOrCreateNode(child_hash);
@@ -300,13 +307,18 @@ pub const MonteCarloTreeSearch = struct {
         var sims: usize = 0;
 
         while (sims < params.max_simulations) : (sims += 1) {
+            self.made_move_list.clear();
             if (params.max_time_ms != 0) {
                 const now = std.time.milliTimestamp();
                 if (@as(usize, @intCast(now - start_ms)) >= params.max_time_ms) break;
             }
 
-            var board_copy = board.*;
-            try self.simulate(&board_copy, root);
+            try self.simulate(board, root);
+
+            while (self.made_move_list.count > 0) {
+                const mv = self.made_move_list.pop();
+                mvs.undoMove(board, mv);
+            }
         }
 
         const m = pickBestMove(root);
@@ -320,9 +332,9 @@ pub const MonteCarloTreeSearch = struct {
                 const q = root.childQ(i);
                 const p = root.priors[i];
                 std.debug.print(
-                    "Move: {s}, Visits: {}, Q: {}, P: {}\n",
-                    .{try ptn.moveToString(self.allocator, mv), v, q, p}
-                );
+                "Move: {s}, Visits: {}, Q: {}, P: {}\n",
+                .{try ptn.moveToString(self.allocator, mv), v, q, p}
+            );
             }
 
             std.debug.print("Selected move: {s}\n", .{try ptn.moveToString(self.allocator, m) });

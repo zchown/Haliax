@@ -45,24 +45,28 @@ pub fn computeZobristHash(board: *brd.Board) void {
     }
 
     for (0..brd.num_squares) |sq| {
-        const square = board.squares[sq];
-        const start: usize = if (@as(isize, @intCast(square.len)) - brd.zobrist_stack_depth < 0) 0 else square.len - brd.zobrist_stack_depth;
-        var j: usize = 0;
-        for (start..square.len) |i| {
-            const piece = square.stack[i].?;
-            const piece_type: usize = switch (piece.stone_type) {
-                .Flat => 0,
-                .Standing => 1,
-                .Capstone => 2,
-            };
-            const color: usize = switch (piece.color) {
-                .White => 0,
-                .Black => 1,
-            };
-            hash ^= zobrist_table[sq][color][piece_type][j];
-            j += 1;
-        }
+        hashPosition(board, @intCast(sq));
     }
+
+    // for (0..brd.num_squares) |sq| {
+    //     const square = board.squares[sq];
+    //     const start: usize = if (@as(isize, @intCast(square.len)) - brd.zobrist_stack_depth < 0) 0 else square.len - brd.zobrist_stack_depth;
+    //     var j: usize = 0;
+    //     for (start..square.len) |i| {
+    //         const piece = square.stack[i].?;
+    //         const piece_type: usize = switch (piece.stone_type) {
+    //             .Flat => 0,
+    //             .Standing => 1,
+    //             .Capstone => 2,
+    //         };
+    //         const color: usize = switch (piece.color) {
+    //             .White => 0,
+    //             .Black => 1,
+    //         };
+    //         hash ^= zobrist_table[sq][color][piece_type][j];
+    //         j += 1;
+    //     }
+    // }
 
     board.zobrist_hash = hash;
 }
@@ -110,7 +114,7 @@ pub inline fn hashPosition(board: *brd.Board, pos: brd.Position) void {
     const max_depth = if (square.len > brd.zobrist_stack_depth) square.len - brd.zobrist_stack_depth else 0;
 
     var j:usize = 0;
-    for (max_depth..square.len - 1) |i| {
+    for (max_depth..square.len) |i| {
         const piece = square.stack[i].?;
         const piece_type: usize = switch (piece.stone_type) {
             .Flat => 0,

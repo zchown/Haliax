@@ -73,17 +73,16 @@ fn perftGenerator(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize
 
     var nodes: usize = 0;
 
-    // if (depth == 0) {
-    //     _ = board.checkResult();
-    //     return 1;
-    // }
+    if (depth == 0) {
+        return 1;
+    }
 
     if (board.checkResult().ongoing != 1) {
         // std.debug.print("Game over detected at depth {d}\n", .{depth});
         return 0;
     }
 
-    if (depth == 1) return mvs.countMoves(board);
+    // if (depth == 1) return mvs.countMoves(board);
 
     var generator = gen.MoveGenerator.initDefault(board);
 
@@ -112,7 +111,7 @@ fn perftGenerator(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize
                 std.debug.print("Offending move: {s}\n", .{move_ptn});
                 return err;
             };
-            board.recomputeBitboards();
+            // board.recomputeBitboards();
             board.recountReserves();
             const post_tps = try tps.boardToTPS(allocator.*, board);
             defer allocator.free(post_tps);

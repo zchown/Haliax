@@ -25,9 +25,15 @@ pub const MoveList = struct {
         self.allocator.free(self.moves);
     }
 
+    pub fn pop(self: *MoveList) brd.Move {
+        std.debug.assert(self.count > 0);
+        self.count -= 1;
+        return self.moves[self.count];
+    }
+
     pub fn resize(self: *MoveList, new_capacity: usize) !void {
-        const z = tracy.trace(@src());
-        defer z.end();
+        // const z = tracy.trace(@src());
+        // defer z.end();
 
         const new_moves = try self.allocator.alloc(brd.Move, new_capacity);
         std.mem.copyForwards(brd.Move, new_moves[0..self.count], self.moves[0..self.count]);
@@ -37,8 +43,8 @@ pub const MoveList = struct {
     }
 
     pub fn append(self: *MoveList, move: brd.Move) !void {
-        const z = tracy.trace(@src());
-        defer z.end();
+        // const z = tracy.trace(@src());
+        // defer z.end();
 
         if (self.count >= self.capacity) {
             try self.resize(self.capacity * 2);
@@ -78,7 +84,6 @@ pub const MoveList = struct {
         const dst = try self.addManyAsSlice(src.len);
         @memcpy(dst, src);
     }
-
 };
 
 pub const MoveError = error{
@@ -113,15 +118,13 @@ pub fn checkMove(board: brd.Board, move: brd.Move) MoveError!void {
             } else if (color == brd.Color.Black and board.black_capstones_remaining == 0) {
                 return MoveError.InvalidStone;
             }
-        }
-        else if (move.flag == @intFromEnum(brd.StoneType.Standing)) {
+        } else if (move.flag == @intFromEnum(brd.StoneType.Standing)) {
             if (color == brd.Color.White and board.white_stones_remaining == 0) {
                 return MoveError.InvalidStone;
             } else if (color == brd.Color.Black and board.black_stones_remaining == 0) {
                 return MoveError.InvalidStone;
             }
-        }
-        else if (move.flag == @intFromEnum(brd.StoneType.Flat)) {
+        } else if (move.flag == @intFromEnum(brd.StoneType.Flat)) {
             if (color == brd.Color.White and board.white_stones_remaining == 0) {
                 return MoveError.InvalidStone;
             } else if (color == brd.Color.Black and board.black_stones_remaining == 0) {
@@ -139,7 +142,7 @@ pub fn checkMove(board: brd.Board, move: brd.Move) MoveError!void {
     const end_pos = brd.nthPositionFrom(move.position, dir, length) orelse return MoveError.InvalidPattern;
 
     if (board.squares[move.position].len < length) {
-        std.debug.print("Not enough stones to move: have {d}, need {d}\n", .{board.squares[move.position].len, length});
+        std.debug.print("Not enough stones to move: have {d}, need {d}\n", .{ board.squares[move.position].len, length });
         std.debug.print("Move pattern: {b}\n", .{move.pattern});
         std.debug.print("From position: {d}\n", .{move.position});
         return MoveError.InvalidCount;
@@ -157,8 +160,7 @@ pub fn checkMove(board: brd.Board, move: brd.Move) MoveError!void {
         if (stone.stone_type == brd.StoneType.Standing) {
             if (top_stone.stone_type != brd.StoneType.Capstone) {
                 return MoveError.InvalidCrush;
-            }
-            else {
+            } else {
                 // check that last bit in pattern is a 1
                 if ((move.pattern & 0x1) == 0) {
                     return MoveError.InvalidCrush;
@@ -181,7 +183,6 @@ pub fn checkMove(board: brd.Board, move: brd.Move) MoveError!void {
         }
         cur_pos = brd.nextPosition(cur_pos, dir) orelse return MoveError.InvalidPattern;
     }
-
 }
 
 pub fn makeMoveWithCheck(board: *brd.Board, move: brd.Move) MoveError!void {
@@ -190,8 +191,8 @@ pub fn makeMoveWithCheck(board: *brd.Board, move: brd.Move) MoveError!void {
 }
 
 pub fn makeMove(board: *brd.Board, move: brd.Move) void {
-    const z = tracy.trace(@src());
-    defer z.end();
+    // const z = tracy.trace(@src());
+    // defer z.end();
 
     board.zobrist_hash ^= zob.zobrist_turn_hash;
 
@@ -239,11 +240,8 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
             },
         }
 
-        board.zobrist_hash ^= 
-            zob.zobrist_table[@as(usize, @intCast(move.position))]
-            [@as(usize, @intCast(@intFromEnum(place_color)))]
-            [@as(usize, @intCast(move.flag))]
-            [board.squares[move.position].len - 1];
+        board.zobrist_hash ^=
+            zob.zobrist_table[@as(usize, @intCast(move.position))][@as(usize, @intCast(@intFromEnum(place_color)))][@as(usize, @intCast(move.flag))][board.squares[move.position].len - 1];
         board.placeMoveUpdateVectors(move.position, to_place);
 
         return;
@@ -336,8 +334,7 @@ pub fn checkUndoMove(board: brd.Board, move: brd.Move) MoveError!void {
 
         if (top_stone.color != color and board.half_move_count > 2) {
             return MoveError.InvalidColor;
-        } 
-        else if (top_stone.color == color and board.half_move_count <= 2) {
+        } else if (top_stone.color == color and board.half_move_count <= 2) {
             return MoveError.InvalidColor;
         }
 
@@ -362,12 +359,11 @@ pub fn checkUndoMove(board: brd.Board, move: brd.Move) MoveError!void {
         cur_pos = brd.nextPosition(cur_pos, dir) orelse return MoveError.InvalidPattern;
     }
 
-
     // Reconstruct the list of destination positions used during the original slide.
     var positions: [8]brd.Position = undefined;
     var idx: usize = 0;
     var started: bool = false;
-    cur_pos= move.position;
+    cur_pos = move.position;
 
     for (0..8) |i| {
         const bit = (move.pattern >> (7 - @as(u3, @intCast(i)))) & 0x1;
@@ -466,16 +462,12 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
             },
         }
 
-        board.zobrist_hash ^= 
-            zob.zobrist_table[@as(usize, @intCast(move.position))]
-            [@as(usize, @intCast(@intFromEnum(color)))]
-            [@as(usize, @intCast(@intFromEnum(popped.stone_type)))]
-            [board.squares[move.position].len];
+        board.zobrist_hash ^=
+            zob.zobrist_table[@as(usize, @intCast(move.position))][@as(usize, @intCast(@intFromEnum(color)))][@as(usize, @intCast(@intFromEnum(popped.stone_type)))][board.squares[move.position].len];
         board.placeMoveUndoVectors(move.position);
 
         return;
     }
-
 
     // slide move
     board.to_move = board.to_move.opposite();
@@ -496,7 +488,6 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
 
     // iterate backwards through pattern
     for (0..8) |i| {
-
         if (cur_pos == move.position) {
             break;
         }
@@ -520,7 +511,6 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
     if (board.crushMoves[(board.half_move_count - 1) % brd.crush_map_size] == .Crush) {
         board.squares[end_pos].stack[board.squares[end_pos].len - 1].?.stone_type = brd.StoneType.Standing;
         board.standing_stones |= brd.getPositionBB(end_pos);
-
     }
 
     cur_pos = end_pos;
@@ -537,8 +527,8 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
 }
 
 pub fn generateMoves(board: *const brd.Board, moves: *MoveList) !void {
-    const z = tracy.trace(@src());
-    defer z.end();
+    // const z = tracy.trace(@src());
+    // defer z.end();
 
     if (board.half_move_count < 2) {
         for (0..brd.board_size * brd.board_size) |pos| {
@@ -632,8 +622,7 @@ fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
                         .flag = @intFromEnum(dir),
                     };
                 }
-            }
-            else if (max_steps != 0) {
+            } else if (max_steps != 0) {
                 const patterns = sym.patterns.patterns[max_pickup - 1][max_steps - 1];
                 const out = try moves.addManyAsSlice(patterns.len);
                 for (0..patterns.len) |pattern| {
@@ -649,8 +638,8 @@ fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
 }
 
 pub fn countMoves(board: *const brd.Board) !usize {
-    const z = tracy.trace(@src());
-    defer z.end();
+    // const z = tracy.trace(@src());
+    // defer z.end();
 
     if (board.half_move_count < 2) {
         return @popCount(board.empty_squares);
@@ -664,8 +653,8 @@ pub fn countMoves(board: *const brd.Board) !usize {
 }
 
 fn countPlaceMoves(board: *const brd.Board) usize {
-    const z = tracy.trace(@src());
-    defer z.end();
+    // const z = tracy.trace(@src());
+    // defer z.end();
 
     const color: brd.Color = board.to_move;
     const stones_remaining = if (color == brd.Color.White) board.white_stones_remaining else board.black_stones_remaining;
@@ -681,8 +670,8 @@ fn countPlaceMoves(board: *const brd.Board) usize {
 }
 
 fn countSlideMoves(board: *const brd.Board) !usize {
-    const z = tracy.trace(@src());
-    defer z.end();
+    // const z = tracy.trace(@src());
+    // defer z.end();
 
     const color: brd.Color = board.to_move;
     const color_bits = if (color == brd.Color.White) board.white_control else board.black_control;
@@ -716,8 +705,7 @@ fn countSlideMoves(board: *const brd.Board) !usize {
             if (doing_crush) {
                 const patterns = sym.patterns.combined_patterns[max_pickup - 1][max_steps];
                 total += patterns.len;
-            }
-            else if (max_steps > 0) {
+            } else if (max_steps > 0) {
                 const patterns = sym.patterns.patterns[max_pickup - 1][max_steps - 1];
                 total += patterns.len;
             }
@@ -725,5 +713,3 @@ fn countSlideMoves(board: *const brd.Board) !usize {
     }
     return total;
 }
-
-

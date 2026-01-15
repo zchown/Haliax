@@ -248,6 +248,7 @@ pub fn build(b: *std.Build) void {
     tree_search_module.addImport("zobrist", zobrist_module);
     tree_search_module.addImport("moves", moves_module);
     tree_search_module.addImport("ptn", ptn_module);
+    tree_search_module.addImport("tps", tps_module);
 
     tree_search_module.addImport("zobrist", zobrist_module);
 

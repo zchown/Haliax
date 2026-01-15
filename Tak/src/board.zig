@@ -11,7 +11,7 @@ pub const capstone_count = 1;
 pub const total_pieces = stone_count + capstone_count;
 pub const max_pickup = board_size;
 pub const max_stack_height = 2 * stone_count + 1;
-pub const komi = 2.0;
+pub var komi: f32 = 2.0;
 pub const num_piece_types = 3;
 pub const num_colors = 2;
 pub const zobrist_stack_depth = board_size + 1;
@@ -450,8 +450,8 @@ pub const Board = struct {
         if (self.empty_squares == 0 or (whites * blacks) == 0) {
             const white_flats: Bitboard = (self.white_control & ~self.standing_stones) & ~self.capstones;
             const black_flats: Bitboard = (self.black_control & ~self.standing_stones) & ~self.capstones;
-            const white_count: f64 = @as(f64, @floatFromInt(countBits(white_flats)));
-            const black_count: f64 = @as(f64, @floatFromInt(countBits(black_flats)));
+            const white_count: f32 = @as(f32, @floatFromInt(countBits(white_flats)));
+            const black_count: f32 = @as(f32, @floatFromInt(countBits(black_flats)));
             if (white_count == black_count + komi) {
                 self.game_status = Result{
                     .road = 0,

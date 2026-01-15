@@ -60,6 +60,7 @@ pub fn runTEI(
         if (std.mem.eql(u8, cmd, "tei")) {
             try emit.fmt(out, "id name {s}", .{engine_name});
             try emit.fmt(out, "id author {s}", .{engine_author});
+            try emit.line(out, "option name HalfKomi type spin default 0 min 0 max 10");
             try emit.line(out, "teiok");
             continue;
         }
@@ -67,9 +68,34 @@ pub fn runTEI(
             try emit.line(out, "readyok");
             continue;
         }
-        // TODO: currently ignored
+
         if (std.mem.eql(u8, cmd, "setoption")) {
-            try emit.line(out, "ok");
+            var opt_name: ?[]const u8 = null;
+            var opt_value: ?[]const u8 = null;
+
+            while (tok.next()) |t| {
+                if (std.mem.eql(u8, t, "name")) {
+                    opt_name = tok.next();
+                } else if (std.mem.eql(u8, t, "value")) {
+                    opt_value = tok.next();
+                }
+            }
+
+            if (opt_name) |n| {
+                if (std.mem.eql(u8, n, "HalfKomi")) {
+                    if (opt_value) |v| {
+                        const half: i32 = std.fmt.parseInt(i32, v, 10) catch continue;
+                        brd.komi = @as(f32, @floatFromInt(half)) * 0.5;
+                        try emit.line(out, "ok");
+                    }
+                }
+            }
+            continue;
+        }
+
+
+        if (std.mem.eql(u8, cmd, "option")) {
+            try emit.line(out, "HalfKomi");
             continue;
         }
 
