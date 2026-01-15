@@ -44,10 +44,10 @@ pub fn runTEI(
         }
     };
 
-    std.debug.print("TEI Engine Started\n", .{});
+    // std.debug.print("TEI Engine Started\n", .{});
 
     while (true) {
-        std.debug.print(">> ", .{});
+        // std.debug.print(">> ", .{});
         const maybe_line = in.takeDelimiterExclusive('\n') catch |err| switch (err) {
             error.EndOfStream => break,
             else => return err,
@@ -88,6 +88,11 @@ pub fn runTEI(
             try emit.line(out, "ok");
             continue;
         }
+
+        if (std.mem.eql(u8, cmd, "debug")) {
+            std.debug.print("Debug, TPS: {s}\n", .{try tps.boardToTPS(allocator, &engine.board)});
+        }
+
 
         if (std.mem.eql(u8, cmd, "position")) {
             const rest = std.mem.trimLeft(u8, trimmed[cmd.len..], " \t");

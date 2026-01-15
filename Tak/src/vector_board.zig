@@ -93,7 +93,10 @@ pub const BoardState = struct {
         var my_below_piece_count: f32 = 0;
         var opp_below_piece_count: f32 = 0;
 
-        const min_stack_index = square.len - 7;
+        var min_stack_index: usize = 0;
+        if (square.len >= 7) {
+            min_stack_index = square.len - 7;
+        }
         for (0.. square.len - 2) |i| {
             const piece = square.stack[i].?;
             const is_my_piece = piece.color == self.perspective;

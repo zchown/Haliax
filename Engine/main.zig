@@ -9,10 +9,8 @@ pub fn main() !void {
 
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     var allocator = gpa.allocator();
-    var arena = std.heap.ArenaAllocator.init(allocator);
-    var arena_allocator = arena.allocator();
 
-    var eng = try engine.Engine.init(&allocator, &arena_allocator);
+    var eng = try engine.Engine.init(&allocator);
     defer eng.deinit();
 
     try tei.runTEI(allocator, &eng, "Haliax", "Zander Chown");

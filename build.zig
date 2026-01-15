@@ -247,19 +247,8 @@ pub fn build(b: *std.Build) void {
     tree_search_module.addImport("tracy", tracy_module);
     tree_search_module.addImport("zobrist", zobrist_module);
     tree_search_module.addImport("moves", moves_module);
+    tree_search_module.addImport("ptn", ptn_module);
 
-    const monte_carlo_table_module = b.createModule(.{
-        .root_source_file = b.path("Engine/MonteCarlo/monte_carlo_table.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    monte_carlo_table_module.addImport("board", board_module);
-    monte_carlo_table_module.addImport("zobrist", zobrist_module);
-    monte_carlo_table_module.addImport("tracy", tracy_module);
-    monte_carlo_table_module.addImport("tree_search", tree_search_module);
-
-    tree_search_module.addImport("monte_carlo_table", monte_carlo_table_module);
     tree_search_module.addImport("zobrist", zobrist_module);
 
     const tei_module = b.createModule(.{
@@ -274,7 +263,6 @@ pub fn build(b: *std.Build) void {
     tei_module.addImport("ptn", ptn_module);
     tei_module.addImport("tps", tps_module);
 
-    monte_carlo_table_module.addImport("tei", tei_module);
     tree_search_module.addImport("tei", tei_module);
 
     const engine_module = b.createModule(.{
@@ -288,7 +276,6 @@ pub fn build(b: *std.Build) void {
     engine_module.addImport("ptn", ptn_module);
     engine_module.addImport("tps", tps_module);
     engine_module.addImport("tei", tei_module);
-    engine_module.addImport("monte_carlo_table", monte_carlo_table_module);
     engine_module.addImport("tree_search", tree_search_module);
     engine_module.addImport("tracy", tracy_module);
 
@@ -313,7 +300,6 @@ pub fn build(b: *std.Build) void {
     engine.root_module.addImport("tracy", tracy_module);
     engine.root_module.addImport("move_generation", move_generation_module);
 
-    engine.root_module.addImport("monte_carlo_table", monte_carlo_table_module);
     engine.root_module.addImport("tree_search", tree_search_module);
     engine.root_module.addImport("tei", tei_module);
     engine.root_module.addImport("engine", engine_module);

@@ -19,6 +19,14 @@ pub const TPSError = error{
     OutOfMemory,
 };
 
+pub fn updateBoardFromTPS(b: *Board, tps: []const u8) !void {
+    const z = tracy.trace(@src());
+    defer z.end();
+
+    const new_board = try parseTPS(tps);
+    b.* = new_board;
+}
+
 pub fn parseTPS(tps: []const u8) !Board {
     const z = tracy.trace(@src());
     defer z.end();

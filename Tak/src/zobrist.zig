@@ -14,7 +14,7 @@ pub const zobrist_turn_hash: ZobristHash = blk: {
     break :blk splitMix64(&seed);
 };
 
-fn splitMix64(key: *u64) u64 {
+pub fn splitMix64(key: *u64) u64 {
     key.* = key.* +% 0x9E3779B97F4A7C15;
     var z = key.*;
     z = (z ^ (z >> 30)) *% 0xBF584761CE4E5B9;
