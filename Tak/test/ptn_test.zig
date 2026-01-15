@@ -97,7 +97,7 @@ test "directionToChar conversions" {
 test "moveToString - flat placement" {
     var allocator = testing.allocator;
     const move = brd.Move.createPlaceMove(brd.getPos(2, 3), .Flat);
-    const str = try ptn.moveToString(&allocator, move, .White);
+    const str = try ptn.moveToString(&allocator, move);
     defer allocator.free(str);
 
     try testing.expectEqualStrings("c4", str);
@@ -106,7 +106,7 @@ test "moveToString - flat placement" {
 test "moveToString - standing stone" {
     var allocator = testing.allocator;
     const move = brd.Move.createPlaceMove(brd.getPos(0, 0), .Standing);
-    const str = try ptn.moveToString(&allocator, move, .White);
+    const str = try ptn.moveToString(&allocator, move);
     defer allocator.free(str);
 
     try testing.expectEqualStrings("Sa1", str);
@@ -115,7 +115,7 @@ test "moveToString - standing stone" {
 test "moveToString - capstone" {
     var allocator = testing.allocator;
     const move = brd.Move.createPlaceMove(brd.getPos(5, 5), .Capstone);
-    const str = try ptn.moveToString(&allocator, move, .White);
+    const str = try ptn.moveToString(&allocator, move);
     defer allocator.free(str);
 
     try testing.expectEqualStrings("Cf6", str);
@@ -124,7 +124,7 @@ test "moveToString - capstone" {
 test "moveToString - simple slide" {
     var allocator = testing.allocator;
     const move = brd.Move.createSlideMove(brd.getPos(0, 0), .North, 1);
-    const str = try ptn.moveToString(&allocator, move, .White);
+    const str = try ptn.moveToString(&allocator, move);
     defer allocator.free(str);
 
     try testing.expect(str.len >= 3);
@@ -136,7 +136,7 @@ test "moveToString - simple slide" {
 test "moveToString - slide" {
     var allocator = testing.allocator;
     const move = brd.Move.createSlideMove(brd.getPos(4, 0), .North, 0b00000100);
-    const str = try ptn.moveToString(&allocator, move, .White);
+    const str = try ptn.moveToString(&allocator, move);
     defer allocator.free(str);
     // std.debug.print("Slide move string: {s}\n", .{str});
 
@@ -311,7 +311,7 @@ test "round trip - place moves" {
 
     for (test_cases) |original| {
         const move = try ptn.parseMove(original);
-        const converted = try ptn.moveToString(&allocator, move, .White);
+        const converted = try ptn.moveToString(&allocator, move);
         defer allocator.free(converted);
 
         try testing.expectEqualStrings(original, converted);
@@ -334,7 +334,7 @@ test "round trip - slide moves" {
         const move = try ptn.parseMove(original);
         // move.print();
 
-        const converted = try ptn.moveToString(&allocator, move, .White);
+        const converted = try ptn.moveToString(&allocator, move);
         defer allocator.free(converted);
 
         try testing.expectEqualStrings(original, converted);

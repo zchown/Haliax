@@ -383,7 +383,7 @@ test "standing blocker" {
     defer move_list.deinit();
 
     const move = brd.Move.createSlideMove(brd.getPos(3, 1), .North, 0b00000001);
-    const move_string = ptn.moveToString(&allocator, move, brd.Color.White) catch unreachable;
+    const move_string = ptn.moveToString(&allocator, move) catch unreachable;
     defer testing.allocator.free(move_string);
     // std.debug.print("Testing move: {s}\n", .{move_string});
 
@@ -396,7 +396,7 @@ test "standing stone slide" {
 
     const move = brd.Move.createSlideMove(brd.getPos(2, 5), .East, 0b00000011);
     var allocator = testing.allocator;
-    const move_string = ptn.moveToString(&allocator, move, brd.Color.White) catch unreachable;
+    const move_string = ptn.moveToString(&allocator, move) catch unreachable;
     defer testing.allocator.free(move_string);
     // std.debug.print("Testing move: {s}\n", .{move_string});
 
@@ -419,7 +419,7 @@ test "lots of standing stones" {
     try moves.generateMoves(&board, &move_list);
 
     for (move_list.moves[0..move_list.count]) |move| {
-        const move_string = ptn.moveToString(&allocator, move, board.to_move) catch unreachable;
+        const move_string = ptn.moveToString(&allocator, move) catch unreachable;
         defer testing.allocator.free(move_string);
         // std.debug.print("Generated move: {s}\n", .{move_string});
     }

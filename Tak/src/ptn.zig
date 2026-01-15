@@ -88,7 +88,6 @@ pub fn parsePTN(allocator: std.mem.Allocator, input: []const u8) !PTN {
                     continue;
                 }
 
-                const color_to_use = if (flip < 2) current_color.opposite() else current_color;
                 const move = try parseMove(token);
                 try ptn.moves.append(allocator, move);
 
@@ -214,9 +213,7 @@ pub fn directionToChar(dir: brd.Direction) u8 {
     };
 }
 
-pub fn moveToString(allocator: *std.mem.Allocator, move: brd.Move, color: brd.Color) ![]u8 {
-    _ = color;
-
+pub fn moveToString(allocator: *std.mem.Allocator, move: brd.Move) ![]u8 {
     const x = brd.getX(move.position);
     const y = brd.getY(move.position);
 

@@ -172,6 +172,13 @@ pub const Square = struct {
         };
     }
 
+    pub fn reset(self: *Square) void {
+        self.stack = [_]?Piece{null} ** max_stack_height;
+        self.len = 0;
+        self.white_count = 0;
+        self.black_count = 0;
+    }
+
     pub inline fn top(self: *const Square) ?Piece {
         if (self.len == 0) return null;
         return self.stack[self.len - 1];
@@ -347,8 +354,11 @@ pub const Board = struct {
         return brd;
     }
 
-    pub fn reset(self: *Board) !void {
-        self.squares = [_]Square{} ** num_squares;
+    pub fn reset(self: *Board) void {
+        for (0..num_squares) |pos| {
+            self.squares[pos].reset();
+        }
+
         self.white_stones_remaining = stone_count;
         self.black_stones_remaining = stone_count;
         self.white_capstones_remaining = capstone_count;
