@@ -389,6 +389,12 @@ pub const Board = struct {
         self.black_vector.recomputeReserves(self);
     }
 
+    pub fn recomputeFlatDiffVector(self: *Board) void {
+        if (!do_vector_board) return;
+        self.white_vector.recomputeFlatDiff(self);
+        self.black_vector.recomputeFlatDiff(self);
+    }
+
     pub fn placeMoveUpdateVectors(self: *Board, pos: Position, p: Piece) void {
         if (!do_vector_board) return;
         self.white_vector.placeMoveUpdate(pos, p);
@@ -401,6 +407,15 @@ pub const Board = struct {
         self.white_vector.placeMoveUndo(pos);
         self.black_vector.placeMoveUndo(pos);
         self.recomputeReservesVector();
+    }
+
+    pub fn updateAllVectors(self: *Board) void {
+        if (!do_vector_board) return;
+        for (0..num_squares) |pos| {
+            self.recomputeSquareVector(@intCast(pos));
+        }
+        self.recomputeReservesVector();
+        self.recomputeFlatDiffVector();
     }
 
     pub inline fn equals(self: *const Board, other: *const Board) bool {

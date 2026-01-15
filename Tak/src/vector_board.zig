@@ -11,7 +11,11 @@ const opp_below_layer_offset: usize = 12 * brd.board_size * brd.board_size;
 const my_reserve_layer_offset: usize = 18 * brd.board_size * brd.board_size;
 const opp_reserve_layer_offset: usize = 20 * brd.board_size * brd.board_size;
 
-const flat_differential_offset: usize = 22 * brd.board_size * brd.board_size;
+const stack_len_offset: usize = 22 * brd.board_size * brd.board_size;
+const my_covered_flats_offset: usize = 23 * brd.board_size * brd.board_size;
+const their_covered_flats_offset: usize = 24 * brd.board_size * brd.board_size;
+
+const flat_differential_offset: usize = 25 * brd.board_size * brd.board_size;
 
 pub const BoardState = struct {
     perspective: brd.Color, // Perspective of the player to move
@@ -24,7 +28,7 @@ pub const BoardState = struct {
     pub fn init(perspective: brd.Color) BoardState {
         return BoardState{
             .perspective = perspective,
-            .data = [_]f32{0} ** (brd.board_size * brd.board_size * (6 + 12 + 4 + 1)),
+            .data = [_]f32{0} ** (brd.board_size * brd.board_size * 26),
         };
     }
 
@@ -83,12 +87,25 @@ pub const BoardState = struct {
             return;
         }
 
+        var my_below_piece_count: f32 = 0;
+        var opp_below_piece_count: f32 = 0;
+
+        const min_stack_index = square.len - 7;
         for (0.. square.len - 2) |i| {
             const piece = square.stack[i].?;
             const is_my_piece = piece.color == self.perspective;
+            if (is_my_piece) {
+                my_below_piece_count += 1;
+            } else {
+                opp_below_piece_count += 1;
+            }
+            if (i < min_stack_index) continue;
             const below_layer_offset = if (is_my_piece) my_below_layer_offset else opp_below_layer_offset;
             self.data[below_layer_offset + pos + (i * brd.num_squares)] += 1;
         }
+        self.data[stack_len_offset + pos] = @as(f32, @floatFromInt(square.len));
+        self.data[my_covered_flats_offset + pos] = my_below_piece_count;
+        self.data[their_covered_flats_offset + pos] = opp_below_piece_count;
     }
 
     pub fn recomputeReserves(self: *BoardState, board: *const brd.Board) void {

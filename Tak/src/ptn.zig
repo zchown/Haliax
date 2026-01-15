@@ -89,7 +89,7 @@ pub fn parsePTN(allocator: std.mem.Allocator, input: []const u8) !PTN {
                 }
 
                 const color_to_use = if (flip < 2) current_color.opposite() else current_color;
-                const move = try parseMove(token, color_to_use);
+                const move = try parseMove(token);
                 try ptn.moves.append(allocator, move);
 
                 if (flip < 2) flip += 1;
@@ -101,9 +101,7 @@ pub fn parsePTN(allocator: std.mem.Allocator, input: []const u8) !PTN {
     return ptn;
 }
 
-pub fn parseMove(move_str: []const u8, color: brd.Color) PTNParseError!brd.Move {
-    _ = color;
-
+pub fn parseMove(move_str: []const u8) PTNParseError!brd.Move {
     const crush = move_str.len > 0 and move_str[move_str.len - 1] == '*';
     const str = if (crush) move_str[0 .. move_str.len - 1] else move_str;
 

@@ -1,44 +1,51 @@
 const std = @import("std");
-const brd = @import("board");
 const zob = @import("zobrist");
-const tracy = @import("tracy");
 
 pub const NodeState = enum(u8) { Unknown, Win, Loss, Draw };
 
+pub const SearchNode = struct {
+    zobrist: zob.ZobristHash,
+
+    visits: u32 = 0,
+    value: f32 = 0.0,
+
+    parent_edge: ?*SearchEdge = null,
+    parent: ?*SearchNode = null,
+
+    children: std.ArrayList(*SearchEdge),
+    expanded: bool = false,
+
+    state: NodeState = .Unknown,
+    end_in_ply: u16 = 0,
+    unknown_children: u32 = 0,
+
+    pub fn init(allocator: std.mem.Allocator, key: zob.ZobristHash) SearchNode {
+        return .{
+            .zobrist = key,
+            .children = std.ArrayList(*SearchEdge).init(allocator),
+        };
+    }
+
+    pub fn deinit(self: *SearchNode) void {
+        for (self.children.items) |e| self.children.allocator.destroy(e);
+        self.children.deinit();
+    }
+};
+
 pub const SearchEdge = struct {
-    move: brd.Move,
+    move: @import("board").Move,
     prior: f32,
+
     n: u32 = 0,
     w: f32 = 0.0,
+
+    target: *SearchNode,
 
     pub inline fn q(self: *const SearchEdge) f32 {
         if (self.n == 0) return 0.0;
         return self.w / @as(f32, @floatFromInt(self.n));
     }
 };
-
-pub const SearchNode = struct {
-    zobrist: zob.ZobristHash,
-    children: std.ArrayList(*SearchEdge),
-    terminal: NodeState = .Unknown,
-    expanded: bool = false,
-
-    pub fn init(allocator: std.mem.Allocator, key: zob.ZobristHash) SearchNode {
-        return .{
-            .zobrist = key,
-            .children = std.ArrayList(*SearchEdge).init(allocator),
-            .terminal = .Unknown,
-            .expanded = false,
-        };
-    }
-
-    pub fn deinit(self: *SearchNode) void {
-        for (self.children.items) |edge| self.children.allocator.destroy(edge);
-        self.children.deinit();
-    }
-};
-
-
 
 pub const TableStats = struct {
     lookups: usize = 0,
@@ -48,11 +55,17 @@ pub const TableStats = struct {
 };
 
 pub const MCTable = struct {
-    allocator: std.mem.Allocator,
+    backing_allocator: std.mem.Allocator,
+
+    buf: []u8,
+    fba: std.heap.FixedBufferAllocator,
+    arena_alloc: std.mem.Allocator,
+
     buckets: []?*Entry,
-    stats: TableStats = .{},
+    bucket_count: usize,
 
     nodes: std.ArrayList(*SearchNode),
+    stats: TableStats = .{},
 
     const Entry = struct {
         next: ?*Entry,
@@ -61,64 +74,69 @@ pub const MCTable = struct {
         is_used: bool = true,
     };
 
-    pub fn init(allocator: std.mem.Allocator, bucket_count: usize) !MCTable {
-        const n = if (bucket_count < 1024) 1024 else bucket_count;
-        const buckets = try allocator.alloc(?*Entry, n);
+    pub fn init(
+        backing: std.mem.Allocator,
+        bucket_count_in: usize,
+        arena_bytes: usize,
+    ) !MCTable {
+        const bucket_count = if (bucket_count_in < 1024) 1024 else bucket_count_in;
+
+        const buf = try backing.alloc(u8, arena_bytes);
+        var fba = std.heap.FixedBufferAllocator.init(buf);
+        const arena_alloc = fba.allocator();
+
+        const buckets = try backing.alloc(?*Entry, bucket_count);
         @memset(buckets, null);
 
         return .{
-            .allocator = allocator,
+            .backing_allocator = backing,
+            .buf = buf,
+            .fba = fba,
+            .arena_alloc = arena_alloc,
             .buckets = buckets,
+            .bucket_count = bucket_count,
+            .nodes = std.ArrayList(*SearchNode).init(backing),
             .stats = .{},
-            .nodes = std.ArrayList(*SearchNode).init(allocator),
         };
     }
 
     pub fn deinit(self: *MCTable) void {
-        for (self.buckets) |head| {
-            var e = head;
-            while (e) |cur| {
-                e = cur.next;
-                self.allocator.destroy(cur);
-            }
-        }
-        self.allocator.free(self.buckets);
+        self.backing_allocator.free(self.buckets);
 
-        for (self.nodes.items) |n| {
-            n.deinit();
-            self.allocator.destroy(n);
-        }
         self.nodes.deinit();
+
+        self.backing_allocator.free(self.buf);
     }
 
     fn bucketIndex(self: *const MCTable, key: zob.ZobristHash) usize {
-        return @as(usize, @intCast(key)) % self.buckelen;
+        return @as(usize, @intCast(key)) % self.bucket_count;
     }
 
     pub fn get(self: *MCTable, key: zob.ZobristHash) ?*SearchNode {
-        self.stalookups += 1;
+        self.stats.lookups += 1;
 
         const idx = self.bucketIndex(key);
         var e = self.buckets[idx];
         while (e) |cur| : (e = cur.next) {
             if (cur.key == key and cur.is_used) {
-                self.stahits += 1;
+                self.stats.hits += 1;
                 return cur.node;
             }
         }
-        self.stamisses += 1;
+        self.stats.misses += 1;
         return null;
     }
 
     pub fn getOrCreateNode(self: *MCTable, key: zob.ZobristHash) !*SearchNode {
         if (self.get(key)) |n| return n;
 
-        const node = try self.allocator.create(SearchNode);
-        node.* = SearchNode.init(self.allocator, key);
+        const node = try self.arena_alloc.create(SearchNode);
+        node.* = SearchNode.init(self.arena_alloc, key);
+
         try self.nodes.append(node);
 
         const idx = self.bucketIndex(key);
-        const ent = try self.allocator.create(Entry);
+        const ent = try self.arena_alloc.create(Entry);
         ent.* = .{
             .next = self.buckets[idx],
             .key = key,
@@ -127,7 +145,7 @@ pub const MCTable = struct {
         };
         self.buckets[idx] = ent;
 
-        self.stainserts += 1;
+        self.stats.inserts += 1;
         return node;
     }
 
@@ -145,5 +163,20 @@ pub const MCTable = struct {
         while (e) |cur| : (e = cur.next) {
             if (cur.key == key) cur.is_used = true;
         }
+    }
+
+    pub fn shouldResetArena(self: *const MCTable) bool {
+        const used = self.fba.end_index;
+        return used * 2 >= self.buf.len;
+    }
+
+    pub fn clear(self: *MCTable) void {
+        @memset(self.buckets, null);
+        self.nodes.clearRetainingCapacity();
+
+        self.fba.reset();
+        self.arena_alloc = self.fba.allocator();
+
+        self.stats = .{};
     }
 };

@@ -1,239 +1,397 @@
-
 const std = @import("std");
 const brd = @import("board");
 const tracy = @import("tracy");
 const mct = @import("monte_carlo_table");
 const mvs = @import("moves");
+const tei = @import("tei");
 
 pub const cpuct: f32 = 1.0;
 
-// Temp Eval function type will be updated later to match the NN interface
 pub const EvalFn = *const fn (
-    board: *const brd.Board,
-    moves: []const brd.Move,
+board: *const brd.Board,
+priors_out: []f32,
+) f32;
+
+pub const PriorFn = *const fn (
+    move: brd.Move,
     priors_out: []f32,
 ) f32;
 
+const NodeState = mct.NodeState;
+
 const Trajectory = struct {
+    nodes: std.ArrayList(*mct.SearchNode),
     edges: std.ArrayList(*mct.SearchEdge),
 
     pub fn init(allocator: std.mem.Allocator) Trajectory {
-        return .{ .edges = std.ArrayList(*mct.SearchEdge).init(allocator) };
+        return .{
+            .nodes = std.ArrayList(*mct.SearchNode).init(allocator),
+            .edges = std.ArrayList(*mct.SearchEdge).init(allocator),
+        };
     }
+
     pub fn deinit(self: *Trajectory) void {
+        self.nodes.deinit();
         self.edges.deinit();
     }
+
     pub fn reset(self: *Trajectory) void {
+        self.nodes.clearRetainingCapacity();
         self.edges.clearRetainingCapacity();
+    }
+
+    pub fn push(self: *Trajectory, node: *mct.SearchNode, edge: *mct.SearchEdge) !void {
+        try self.nodes.append(node);
+        try self.edges.append(edge);
+    }
+
+    pub fn len(self: *const Trajectory) usize {
+        std.debug.assert(self.nodes.items.len == self.edges.items.len);
+        return self.edges.items.len;
     }
 };
 
 pub const MonteCarloTreeSearch = struct {
     allocator: std.mem.Allocator,
     table: *mct.MCTable,
-    eval: ?EvalFn,
+    eval_fn: EvalFn,
+    prior_fn: PriorFn,
 
     move_list: mvs.MoveList,
     prior_buf: []f32,
 
     pub fn init(
-        allocator: std.mem.Allocator,
-        table: *mct.MCTable,
-        eval: ?EvalFn,
-        max_moves_hint: usize,
-    ) !MonteCarloTreeSearch {
-        const ml = try mvs.MoveList.init(&allocator, if (max_moves_hint == 0) 256 else max_moves_hint);
-        const pri = try allocator.alloc(f32, ml.capacity);
+    allocator: std.mem.Allocator,
+    table: *mct.MCTable,
+    eval_fn: EvalFn,
+    prior_fn: PriorFn,
+    max_priors: usize,
+) !MonteCarloTreeSearch {
         return .{
             .allocator = allocator,
             .table = table,
-            .eval = eval,
-            .move_list = ml,
-            .prior_buf = pri,
+            .eval_fn = eval_fn,
+            .prior_fn = prior_fn,
+            .move_list = try mvs.MoveList.init(&allocator, 2048),
+            .prior_buf = try allocator.alloc(f32, max_priors),
         };
     }
 
     pub fn deinit(self: *MonteCarloTreeSearch) void {
-        self.allocator.free(self.prior_buf);
         self.move_list.deinit();
+        self.allocator.free(self.prior_buf);
     }
 
-    pub fn search(self: *MonteCarloTreeSearch, root_board: *brd.Board, num_simulations: usize) !brd.Move {
-        const z = tracy.trace(@src());
-        defer z.end();
+    pub fn search(
+    self: *MonteCarloTreeSearch,
+    board: *brd.Board,
+    params: tei.GoParams,
+) !brd.Move {
+        const frame = tracy.frameMarkNamed("MCTS Search");
+        _ = frame;
 
-        const root_node = try self.table.getOrCreateNode(root_board.zobrist_hash);
+        if (self.table.shouldResetArena()) {
+            self.table.clear();
+        }
+
+        const root = try self.table.getOrCreateNode(board.zobrist_hash);
+        self.table.markAsUsed(root.zobrist);
+
+        const iterations: u32 = if (params.nodes) |n|
+            @as(u32, @intCast(@min(n, @as(u64, std.math.maxInt(u32)))))
+            else if (params.depth) |d|
+                @as(u32, 1) << @as(u5, @intCast(@min(d, 16)))
+                else
+                1 << 12;
 
         var traj = Trajectory.init(self.allocator);
         defer traj.deinit();
 
-        var sim: usize = 0;
-        while (sim < num_simulations) : (sim += 1) {
+        var i: u32 = 0;
+        while (i < iterations) : (i += 1) {
             traj.reset();
 
-            var node = root_node;
+            const leaf_value = try self.selectExpand(board, root, &traj);
 
-            while (node.expanded and node.terminal == .Unknown and node.children.items.len > 0) {
-                const edge = self.selectBestEdge(node);
-                try traj.edges.append(edge);
+            self.backPropagate(root, leaf_value, &traj);
+        }
 
-                mvs.makeMove(root_board, edge.move);
-                node = try self.table.getOrCreateNode(root_board.zobrist_hash);
-            }
+        var best: ?*mct.SearchEdge = null;
+        var best_n: u32 = 0;
 
-            const leaf_value = try self.expandIfNeeded(root_board, node);
+        for (root.children.items) |e| {
+            if (e.target.state == .Loss) return e.move;
+        }
 
-            var v: f32 = leaf_value;
-            var i: usize = traj.edges.items.len;
-            while (i > 0) {
-                i -= 1;
-                const e = traj.edges.items[i];
-                e.n += 1;
-                e.w += v;
-                v = -v;
-            }
-
-            i = traj.edges.items.len;
-            while (i > 0) {
-                i -= 1;
-                const e = traj.edges.items[i];
-                mvs.undoMove(root_board, e.move);
+        for (root.children.items) |e| {
+            if (e.n > best_n) {
+                best_n = e.n;
+                best = e;
             }
         }
 
-        if (root_node.children.items.len == 0) return error.NoMoves;
+        if (best) |b| return b.move;
 
-        var best: *mct.SearchEdge = root_node.children.items[0];
-        for (root_node.children.items[1..]) |e| {
-            if (e.n > best.n) best = e;
+        std.debug.assert(false, "MCTS search found no best move");
+
+        // Fallback: generate and return first legal move
+        self.move_list.clear();
+        try mvs.generateMoves(board, &self.move_list);
+        if (self.move_list.count == 0) return brd.Move{ .position = 0, .pattern = 0, .flag = 0 };
+        return self.move_list.moves[0];
+    }
+
+    fn terminalValue(board: *brd.Board) ?f32 {
+        const r = board.checkResult();
+        if (r.ongoing == 1) return null;
+
+        if (r.road == 0 and r.flat == 0) return 0.0;
+
+        const winner: brd.Color = if (r.color == 0) .White else .Black;
+
+        if (winner == board.to_move) return 1.0 else return -1.0;
+    }
+
+    fn setNodeTerminalFromBoard(node: *mct.SearchNode, board: *brd.Board) void {
+        const r = board.checkResult();
+        if (r.ongoing == 1) return;
+
+        if (r.road == 0 and r.flat == 0) {
+            node.state = .Draw;
+            node.end_in_ply = 0;
+            return;
         }
-        return best.move;
+
+        const winner: brd.Color = if (r.color == 0) .White else .Black;
+
+        node.state = if (winner == board.to_move) .Win else .Loss;
+        node.end_in_ply = 0;
     }
 
-    fn ensurePriorCapacity(self: *MonteCarloTreeSearch, needed: usize) !void {
-        if (self.prior_buf.len >= needed) return;
-        var new_cap: usize = if (self.prior_buf.len == 0) 64 else self.prior_buf.len;
-        while (new_cap < needed) new_cap *= 2;
-        self.prior_buf = try self.allocator.realloc(self.prior_buf, new_cap);
+    fn selectExpand(
+    self: *MonteCarloTreeSearch,
+    board: *brd.Board,
+    root: *mct.SearchNode,
+    traj: *Trajectory,
+) !f32 {
+        var node = root;
+
+        while (node.expanded and node.state == .Unknown) {
+            const edge = self.selectBestEdgePUCT(node) orelse break;
+
+            try traj.edges.append(edge);
+
+            mvs.makeMove(board, edge.move);
+
+            if (terminalValue(board)) |tv| {
+                setNodeTerminalFromBoard(edge.target, board);
+                mvs.undoMove(board, edge.move);
+
+                for (traj.edges.items) |e2| {
+                    _ = e2;
+                }
+                return tv;
+            }
+
+            node = edge.target;
+            try traj.nodes.append(node);
+        }
+
+        if (node.state != .Unknown) {
+            const v: f32 = switch (node.state) {
+                .Win => 1.0,
+                .Loss => -1.0,
+                .Draw => 0.0,
+                .Unknown => unreachable,
+            };
+
+            // Undo trajectory moves
+            var j: isize = @as(isize, @intCast(traj.edges.items.len)) - 1;
+            while (j >= 0) : (j -= 1) {
+                mvs.undoMove(board, traj.edges.items[@as(usize, @intCast(j))].move);
+            }
+            return v;
+        }
+
+        if (terminalValue(board)) |tv| {
+            setNodeTerminalFromBoard(node, board);
+
+            var j: isize = @as(isize, @intCast(traj.edges.items.len)) - 1;
+            while (j >= 0) : (j -= 1) {
+                mvs.undoMove(board, traj.edges.items[@as(usize, @intCast(j))].move);
+            }
+            return tv;
+        }
+
+        self.move_list.clear();
+        try mvs.generateMoves(board, &self.move_list);
+        const moves = self.move_list.moves[0..self.move_list.count];
+
+        if (moves.len == 0) {
+            // No moves: something has gone wrong, treat as draw
+            var j: isize = @as(isize, @intCast(traj.edges.items.len)) - 1;
+            while (j >= 0) : (j -= 1) {
+                mvs.undoMove(board, traj.edges.items[@as(usize, @intCast(j))].move);
+            }
+            std.debug.assert(false, "MCTS selectExpand found no legal moves in non-terminal position");
+            return 0.0;
+        }
+
+        const leaf_value = self.eval_fn(board, self.prior_buf);
+
+        node.expanded = true;
+        node.children.clearRetainingCapacity();
+        try node.children.ensureTotalCapacity(moves.len);
+
+        node.unknown_children = 0;
+
+        for (0..moves.len) |i| {
+            const mv = moves[i];
+            mvs.makeMove(board, mv);
+            const child = try self.table.getOrCreateNode(board.zobrist_hash);
+            self.table.markAsUsed(child.zobrist);
+
+            self.setNodeTerminalFromBoard(child, board);
+            if (child.state == .Unknown) node.unknown_children += 1;
+
+            mvs.undoMove(board, mv);
+
+            const e = try self.table.arena_alloc.create(mct.SearchEdge);
+            e.* = .{
+                .move = mv,
+                .prior = self.prior_fn(mv, self.prior_buf),
+                .n = 0,
+                .w = 0.0,
+                .target = child,
+            };
+
+            node.children.appendAssumeCapacity(e);
+        }
+
+        // Undo trajectory moves
+        var j: isize = @as(isize, @intCast(traj.edges.items.len)) - 1;
+        while (j >= 0) : (j -= 1) {
+            mvs.undoMove(board, traj.edges.items[@as(usize, @intCast(j))].move);
+        }
+
+        return leaf_value;
     }
 
-    fn totalVisits(node: *mct.SearchNode) u32 {
-        var total: u32 = 0;
-        for (node.children.items) |e| total += e.n;
-        return total;
-    }
-
-    fn selectBestEdge(self: *MonteCarloTreeSearch, node: *mct.SearchNode) *mct.SearchEdge {
+    fn selectBestEdgePUCT(self: *MonteCarloTreeSearch, node: *mct.SearchNode) ?*mct.SearchEdge {
         _ = self;
 
-        const total_n = @as(f32, @floatFromInt(totalVisits(node))) + 1.0;
-        const sqrt_total = std.math.sqrt(total_n);
+        if (node.children.items.len == 0) return null;
 
-        var best: *mct.SearchEdge = node.children.items[0];
+        // If any move makes opponent proven losing, choose it immediately.
+        for (node.children.items) |e| {
+            if (e.target.state == .Loss) return e;
+        }
+
+        const parent_n: f32 = @as(f32, @floatFromInt(@max(node.visits, 1)));
+        const sqrt_parent = std.math.sqrt(parent_n);
+
+        var best: ?*mct.SearchEdge = null;
         var best_score: f32 = -1e30;
 
+        // Skip immediate losing moves if there exist alternatives
+        var all_losing = true;
         for (node.children.items) |e| {
+            if (e.target.state != .Win) { // not losing for us
+                all_losing = false;
+                break;
+            }
+        }
+
+        for (node.children.items) |e| {
+            if (!all_losing and e.target.state == .Win) continue;
+
             const q = e.q();
-            const n = @as(f32, @floatFromInt(e.n));
-            const u = cpuct * e.prior * sqrt_total / (1.0 + n);
-            const score = q + u;
+            const u = cpuct * e.prior * sqrt_parent / (1.0 + @as(f32, @floatFromInt(e.n)));
+
+            // small progressive bias
+            const pb: f32 = 0.05 / (1.0 + @as(f32, @floatFromInt(e.n)));
+
+            const score = q + u + pb;
             if (score > best_score) {
                 best_score = score;
                 best = e;
             }
         }
+
         return best;
     }
 
-    fn terminalValue(board: *brd.Board) ?f32 {
-        const res = board.checkResult();
-        if (res.ongoing == 1) return null;
+    fn backPropagate(
+    self: *MonteCarloTreeSearch,
+    root: *mct.SearchNode,
+    leaf_value_in: f32,
+    traj: *Trajectory,
+) void {
+        _ = self;
 
-        const winner_color_int: u8 = res.color;
-        if (winner_color_int == 0) return 0.0;
+        root.visits += 1;
+        root.value += (leaf_value_in - root.value) / @as(f32, @floatFromInt(root.visits));
 
-        const winner: brd.Color = @enumFromInt(winner_color_int);
-        return if (winner == board.to_move) 1.0 else -1.0;
-    }
+        var value: f32 = leaf_value_in;
 
-    fn normalizePriors(priors: []f32) void {
-        var sum: f32 = 0.0;
-        for (priors) |p| {
-            if (p > 0.0 and std.math.isFinite(p)) sum += p;
-        }
-        if (sum <= 0.0 or !std.math.isFinite(sum)) {
-            const u: f32 = 1.0 / @as(f32, @floatFromInt(priors.len));
-            for (priors) |*p| p.* = u;
-            return;
-        }
-        const inv = 1.0 / sum;
-        for (priors) |*p| {
-            const v = p.*;
-            p.* = if (v > 0.0 and std.math.isFinite(v)) v * inv else 0.0;
-        }
-    }
+        var i: isize = @as(isize, @intCast(traj.len())) - 1;
+        while (i >= 0) : (i -= 1) {
+            const idx: usize = @as(usize, @intCast(i));
 
-    fn expandIfNeeded(self: *MonteCarloTreeSearch, board: *brd.Board, node: *mct.SearchNode) !f32 {
-        const z = tracy.trace(@src());
-        defer z.end();
+            const node = traj.nodes.items[idx]; // parent node at this ply
+            const edge = traj.edges.items[idx]; // edge chosen from parent node
 
-        if (terminalValue(board)) |v| {
-            node.terminal = if (v > 0.0) .Win else if (v < 0.0) .Loss else .Draw;
-            node.expanded = true;
-            return v;
-        }
+            value = -value;
 
-        node.terminal = .Unknown;
+            edge.n += 1;
+            edge.w += value;
 
-        if (node.expanded) {
-            if (self.eval) |efn| {
-                self.move_list.count = 0;
-                try mvs.generateMoves(board, &self.move_list);
-                const moves = self.move_list.moves[0..self.move_list.count];
-                if (moves.len == 0) return 0.0;
+            node.visits += 1;
+            node.value += (value - node.value) / @as(f32, @floatFromInt(node.visits));
 
-                try self.ensurePriorCapacity(moves.len);
-                _ = efn(board, moves, self.prior_buf[0..moves.len]);
+            if (node.expanded and node.state == .Unknown and node.children.items.len != 0) {
+                var unknown: u32 = 0;
+                var saw_draw = false;
+
+                var best_win: u16 = std.math.maxInt(u16); // win in min ply
+                var worst: u16 = 0;                      // loss/draw in max ply
+
+                for (node.children.items) |e| {
+                    const c = e.target;
+                    if (c.state == .Unknown) {
+                        unknown += 1;
+                        continue;
+                    }
+
+                    const d: u16 = c.end_in_ply + 1;
+
+                    if (c.state == .Loss) {
+                        if (d < best_win) best_win = d;
+                    } else if (c.state == .Draw) {
+                        saw_draw = true;
+                        if (d > worst) worst = d;
+                    } else {
+                        if (d > worst) worst = d;
+                    }
+                }
+
+                node.unknown_children = unknown;
+
+                if (unknown == 0) {
+                    if (best_win != std.math.maxInt(u16)) {
+                        node.state = .Win;
+                        node.end_in_ply = best_win;
+                    } else if (saw_draw) {
+                        node.state = .Draw;
+                        node.end_in_ply = worst;
+                    } else {
+                        node.state = .Loss;
+                        node.end_in_ply = worst;
+                    }
+                }
             }
-            return 0.0;
         }
-
-        self.move_list.count = 0;
-        try mvs.generateMoves(board, &self.move_list);
-        const moves = self.move_list.moves[0..self.move_list.count];
-
-        if (moves.len == 0) {
-            node.expanded = true;
-            node.terminal = .Draw;
-            return 0.0;
-        }
-
-        try self.ensurePriorCapacity(moves.len);
-
-        var value: f32 = 0.0;
-        if (self.eval) |efn| {
-            value = efn(board, moves, self.prior_buf[0..moves.len]);
-            normalizePriors(self.prior_buf[0..moves.len]);
-        } else {
-            const u: f32 = 1.0 / @as(f32, @floatFromInt(moves.len));
-            for (self.prior_buf[0..moves.len]) |*p| p.* = u;
-            value = 0.0;
-        }
-
-        try node.children.ensureTotalCapacity(moves.len);
-        var i: usize = 0;
-        while (i < moves.len) : (i += 1) {
-            const e = try node.children.allocator.create(mct.SearchEdge);
-            e.* = .{
-                .move = moves[i],
-                .prior = self.prior_buf[i],
-                .n = 0,
-                .w = 0.0,
-            };
-            node.children.appendAssumeCapacity(e);
-        }
-
-        node.expanded = true;
-        return value;
     }
+
 };
+

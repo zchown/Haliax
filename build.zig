@@ -273,6 +273,23 @@ pub fn build(b: *std.Build) void {
     tei_module.addImport("ptn", ptn_module);
     tei_module.addImport("tps", tps_module);
 
+    monte_carlo_table_module.addImport("tei", tei_module);
+
+    const engine_module = b.createModule(.{
+        .root_source_file = b.path("Engine/engine.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    engine_module.addImport("board", board_module);
+    engine_module.addImport("moves", moves_module);
+    engine_module.addImport("ptn", ptn_module);
+    engine_module.addImport("tps", tps_module);
+    engine_module.addImport("tei", tei_module);
+    engine_module.addImport("monte_carlo_table", monte_carlo_table_module);
+    engine_module.addImport("tree_search", tree_search_module);
+    engine_module.addImport("tracy", tracy_module);
+
     const engine = b.addExecutable(.{
         .name = "Haliax",
         .root_module = b.createModule(.{
@@ -295,6 +312,7 @@ pub fn build(b: *std.Build) void {
     engine.root_module.addImport("monte_carlo_table", monte_carlo_table_module);
     engine.root_module.addImport("tree_search", tree_search_module);
     engine.root_module.addImport("tei", tei_module);
+    engine.root_module.addImport("engine", engine_module);
 
     b.installArtifact(engine);
 

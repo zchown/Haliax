@@ -3,6 +3,8 @@ const brd = @import("board");
 const ptn = @import("ptn");
 const tps = @import("tps");
 
+const start_pos_tps = "[TPS x6/x6/x6/x6/x6/x6 1 1]";
+
 pub const GoParams = struct {
     wtime_ms: ?u64 = null,
     btime_ms: ?u64 = null,
@@ -18,11 +20,11 @@ pub const EngineCallbacks = struct {
 
     onNewGame: *const fn (ctx: *anyopaque, size: usize) anyerror!void,
 
-    onSetPosition: *const fn (ctx: *anyopaque, b: *brd.Board) anyerror!void,
+    onSetPosition: *const fn (ctx: *anyopaque, []const u8) anyerror!void,
 
-    onApplyMove: *const fn (ctx: *anyopaque, b: *brd.Board, m: brd.Move) anyerror!void,
+    onApplyMove: *const fn (ctx: *anyopaque, m: brd.Move) anyerror!void,
 
-    onGo: *const fn (ctx: *anyopaque, b: *brd.Board, params: GoParams) anyerror!brd.Move,
+    onGo: *const fn (ctx: *anyopaque, params: GoParams) anyerror!brd.Move,
 
     onStop: *const fn (ctx: *anyopaque) void,
 };
@@ -42,8 +44,6 @@ pub fn runTEI(
     const out = bw.writer();
 
     var line_buf: [8192]u8 = undefined;
-
-    var board = brd.Board.init();
 
     const emit = struct {
         fn line(writer: anytype, bw_ref: *std.io.BufferedWriter(4096, @TypeOf(stdout_file.writer())), s: []const u8) !void {
@@ -96,8 +96,7 @@ pub fn runTEI(
                 std.debug.print("Warning: TEI newgame size {d} not supported, using {d}\n", .{size, brd.board_size});
             }
             try callbacks.onNewGame(callbacks.ctx, size);
-            board.reset();
-            try callbacks.onSetPosition(callbacks.ctx, &board);
+            try callbacks.onSetPosition(callbacks.ctx, start_pos_tps);
             try emit.line(out, &bw, "ok");
             continue;
         }
@@ -114,12 +113,10 @@ pub fn runTEI(
             }
 
             if (std.mem.startsWith(u8, pos_part, "startpos")) {
-                board.reset();
-                try callbacks.onSetPosition(callbacks.ctx, &board);
+                try callbacks.onSetPosition(callbacks.ctx);
             } else if (std.mem.startsWith(u8, pos_part, "tps ")) {
                 const tps_str = std.mem.trim(u8, pos_part["tps ".len..], " \t");
-                board = try tps.parseTPS(tps_str);
-                try callbacks.onSetPosition(callbacks.ctx, &board);
+                try callbacks.onSetPosition(callbacks.ctx, tps_str);
             } else {
                 // Unknown position form
                 std.debug.print("Unknown position command: {s}\n", .{pos_part});
@@ -127,11 +124,9 @@ pub fn runTEI(
 
             if (moves_part) |mp| {
                 var mtok = std.mem.tokenizeAny(u8, mp, " \t");
-                var cur_color: brd.Color = board.to_move;
                 while (mtok.next()) |mstr| {
-                    const mv = try ptn.parseMove(mstr, cur_color);
-                    try callbacks.onApplyMove(callbacks.ctx, &board, mv);
-                    cur_color = cur_color.opposite();
+                    const mv = try ptn.parseMove(mstr);
+                    try callbacks.onApplyMove(callbacks.ctx, mv);
                 }
             }
 
@@ -161,10 +156,10 @@ pub fn runTEI(
                 }
             }
 
-            const best = try callbacks.onGo(callbacks.ctx, &board, params);
+            const best = try callbacks.onGo(callbacks.ctx, params);
 
             var a = allocator;
-            const ptn_str = try ptn.moveToString(&a, best, board.to_move);
+            const ptn_str = try ptn.moveToString(&a, best);
             defer allocator.free(ptn_str);
 
             try emit.fmt(out, &bw, "bestmove {s}", .{ptn_str});

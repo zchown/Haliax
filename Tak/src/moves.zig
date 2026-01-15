@@ -198,8 +198,7 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
     var did_crush: bool = false;
 
     defer {
-        board.black_vector.update_flat_differential(board);
-        board.white_vector.update_flat_differential(board);
+        board.recomputeFlatDiffVector();
         board.to_move = board.to_move.opposite();
         board.half_move_count += 1;
         if (!did_crush) {
@@ -424,8 +423,7 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
     }
 
     defer {
-        board.black_vector.update_flat_differential(board);
-        board.white_vector.update_flat_differential(board);
+        board.recomputeFlatDiffVector();
         board.half_move_count -= 1;
         board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
         if (brd.do_road_uf) {

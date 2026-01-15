@@ -13,7 +13,7 @@ test "PTN init and deinit" {
 }
 
 test "parseMove - simple flat placement" {
-    const move = try ptn.parseMove("a1", .White);
+    const move = try ptn.parseMove("a1");
 
     try testing.expectEqual(brd.getPos(0, 0), move.position);
     try testing.expectEqual(@as(u2, @intFromEnum(brd.StoneType.Flat)), move.flag);
@@ -21,7 +21,7 @@ test "parseMove - simple flat placement" {
 }
 
 test "parseMove - standing stone" {
-    const move = try ptn.parseMove("Sa3", .White);
+    const move = try ptn.parseMove("Sa3");
 
     try testing.expectEqual(brd.getPos(0, 2), move.position);
     try testing.expectEqual(@as(u2, @intFromEnum(brd.StoneType.Standing)), move.flag);
@@ -29,7 +29,7 @@ test "parseMove - standing stone" {
 }
 
 test "parseMove - capstone" {
-    const move = try ptn.parseMove("Cf6", .White);
+    const move = try ptn.parseMove("Cf6");
 
     try testing.expectEqual(brd.getPos(5, 5), move.position);
     try testing.expectEqual(@as(u2, @intFromEnum(brd.StoneType.Capstone)), move.flag);
@@ -37,7 +37,7 @@ test "parseMove - capstone" {
 }
 
 test "parseMove - simple slide north" {
-    const move = try ptn.parseMove("a1+", .White);
+    const move = try ptn.parseMove("a1+");
 
     try testing.expectEqual(brd.getPos(0, 0), move.position);
     try testing.expectEqual(@as(u2, @intFromEnum(brd.Direction.North)), move.flag);
@@ -45,35 +45,35 @@ test "parseMove - simple slide north" {
 }
 
 test "parseMove - simple slide south" {
-    const move = try ptn.parseMove("b2-", .White);
+    const move = try ptn.parseMove("b2-");
 
     try testing.expectEqual(brd.getPos(1, 1), move.position);
     try testing.expectEqual(@as(u2, @intFromEnum(brd.Direction.South)), move.flag);
 }
 
 test "parseMove - simple slide east" {
-    const move = try ptn.parseMove("c3>", .White);
+    const move = try ptn.parseMove("c3>");
 
     try testing.expectEqual(brd.getPos(2, 2), move.position);
     try testing.expectEqual(@as(u2, @intFromEnum(brd.Direction.East)), move.flag);
 }
 
 test "parseMove - simple slide west" {
-    const move = try ptn.parseMove("d4<", .White);
+    const move = try ptn.parseMove("d4<");
 
     try testing.expectEqual(brd.getPos(3, 3), move.position);
     try testing.expectEqual(@as(u2, @intFromEnum(brd.Direction.West)), move.flag);
 }
 
 test "parseMove - slide with count" {
-    const move = try ptn.parseMove("3a1+", .White);
+    const move = try ptn.parseMove("3a1+");
 
     try testing.expectEqual(brd.getPos(0, 0), move.position);
     try testing.expectEqual(@as(u2, @intFromEnum(brd.Direction.North)), move.flag);
 }
 
 test "parseMove - slide with drops" {
-    const move = try ptn.parseMove("3a1+12", .White);
+    const move = try ptn.parseMove("3a1+12");
 
     try testing.expectEqual(brd.getPos(0, 0), move.position);
     try testing.expectEqual(@as(u2, @intFromEnum(brd.Direction.North)), move.flag);
@@ -81,7 +81,7 @@ test "parseMove - slide with drops" {
 }
 
 test "parseMove - with crush indicator" {
-    const move = try ptn.parseMove("a1+*", .White);
+    const move = try ptn.parseMove("a1+*");
 
     try testing.expectEqual(brd.getPos(0, 0), move.position);
     try testing.expectEqual(@as(u2, @intFromEnum(brd.Direction.North)), move.flag);
@@ -279,7 +279,7 @@ test "parseMove - all positions" {
     };
 
     for (positions, 0..) |pos_str, i| {
-        const move = try ptn.parseMove(pos_str, .White);
+        const move = try ptn.parseMove(pos_str);
         const expected_x = i / 6;
         const expected_y = i % 6;
 
@@ -288,14 +288,14 @@ test "parseMove - all positions" {
 }
 
 test "parseMove - invalid position" {
-    try testing.expectError(ptn.PTNParseError.PositionError, ptn.parseMove("g1", .White));
-    try testing.expectError(ptn.PTNParseError.PositionError, ptn.parseMove("a7", .White));
-    try testing.expectError(ptn.PTNParseError.PositionError, ptn.parseMove("z9", .White));
+    try testing.expectError(ptn.PTNParseError.PositionError, ptn.parseMove("g1"));
+    try testing.expectError(ptn.PTNParseError.PositionError, ptn.parseMove("a7"));
+    try testing.expectError(ptn.PTNParseError.PositionError, ptn.parseMove("z9"));
 }
 
 test "parseMove - invalid format" {
-    try testing.expectError(ptn.PTNParseError.PositionError, ptn.parseMove("1", .White));
-    try testing.expectError(ptn.PTNParseError.PositionError, ptn.parseMove("a", .White));
+    try testing.expectError(ptn.PTNParseError.PositionError, ptn.parseMove("1"));
+    try testing.expectError(ptn.PTNParseError.PositionError, ptn.parseMove("a"));
 }
 
 test "round trip - place moves" {
@@ -310,7 +310,7 @@ test "round trip - place moves" {
     };
 
     for (test_cases) |original| {
-        const move = try ptn.parseMove(original, .White);
+        const move = try ptn.parseMove(original);
         const converted = try ptn.moveToString(&allocator, move, .White);
         defer allocator.free(converted);
 
@@ -331,7 +331,7 @@ test "round trip - slide moves" {
     };
 
     for (test_cases) |original| {
-        const move = try ptn.parseMove(original, .White);
+        const move = try ptn.parseMove(original);
         // move.print();
 
         const converted = try ptn.moveToString(&allocator, move, .White);
