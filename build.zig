@@ -288,6 +288,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    onnxrt_module.addIncludePath(b.path("third_party/onnxruntime/include"));
+
     const nn_eval_module = b.createModule(.{
         .root_source_file = b.path("Engine/NeuralNetwork/nn_eval.zig"),
         .target = target,
@@ -308,6 +310,8 @@ pub fn build(b: *std.Build) void {
         .use_llvm = true,
     });
 
+    engine_module.addImport("nn_eval", nn_eval_module);
+
     engine.root_module.addImport("board", board_module);
     engine.root_module.addImport("moves", moves_module);
     engine.root_module.addImport("ptn", ptn_module);
@@ -323,13 +327,11 @@ pub fn build(b: *std.Build) void {
     engine.root_module.addImport("onnxrt", onnxrt_module);
     engine.root_module.addImport("nn_eval", nn_eval_module);
 
-    engine.addIncludePath(b.path("third_party/onnxruntime/include"));
+    engine.root_module.addIncludePath(b.path("third_party/onnxruntime/include"));
     engine.addLibraryPath(b.path("third_party/onnxruntime/lib"));
     engine.addRPath(b.path("third_party/onnxruntime/lib"));
     engine.linkSystemLibrary("onnxruntime");
-
-    engine.linkSystemLibrary("onnxruntime");
-
+    
     b.installArtifact(engine);
 
     const engine_options = b.addOptions();
@@ -381,7 +383,7 @@ pub fn build(b: *std.Build) void {
     self_play.root_module.addImport("onnxrt", onnxrt_module);
     self_play.root_module.addImport("nn_eval", nn_eval_module);
 
-    self_play.addIncludePath(b.path("third_party/onnxruntime/include"));
+    self_play.root_module.addIncludePath(b.path("third_party/onnxruntime/include"));
     self_play.addLibraryPath(b.path("third_party/onnxruntime/lib"));
     self_play.addRPath(b.path("third_party/onnxruntime/lib"));
     self_play.linkSystemLibrary("onnxruntime");

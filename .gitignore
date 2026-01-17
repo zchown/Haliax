@@ -3,6 +3,8 @@ zig-cache/
 zig-out/
 .zig-cache/
 
+.venv/
+
 # Build outputs
 *.o
 *.so
@@ -56,3 +58,9 @@ temp
 *.profraw
 
 third_party/*/
+
+*.onnx
+
+*.data
+
+*.takbin

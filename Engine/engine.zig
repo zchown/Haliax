@@ -5,7 +5,7 @@ const tps = @import("tps");
 const ptn = @import("ptn");
 const tei = @import("tei");
 const ts = @import("tree_search");
-const mcts = @import("monte_carlo_table");
+const nn = @import("nn_eval");
 const tracy = @import("tracy");
 
 const prior_count = 16;
@@ -14,29 +14,33 @@ pub const Engine = struct {
     allocator: *std.mem.Allocator,
     board: brd.Board,
     tree_search: ts.MonteCarloTreeSearch,
+    nn_eval: nn.NNEval,
 
     pub fn init(
         allocator: *std.mem.Allocator,
+        model_path: []const u8,
     ) !Engine {
         var e = Engine{
             .allocator = allocator,
             .board = brd.Board.init(),
             .tree_search = undefined,
+            .nn_eval = undefined,
         };
-        e.tree_search = try ts.MonteCarloTreeSearch.init(allocator, eval, false, true);
+
+        e.nn_eval = try nn.NNEval.init(allocator.*, model_path);
+
+        e.tree_search = try ts.MonteCarloTreeSearch.init(allocator, &e.nn_eval, evalThunk, false, false);
         return e;
     }
 
     pub fn deinit(self: *Engine) void {
         self.tree_search.deinit();
+        self.nn_eval.deinit();
     }
 
-    pub fn eval(b: *const brd.Board, _: []f32) f32 {
-        if (b.to_move == brd.Color.White) {
-            return b.white_vector.data[25 * 36 + 5];
-        } else {
-            return b.black_vector.data[25 * 36 + 5];
-        }
+    fn evalThunk(ctx: *anyopaque, b: *const brd.Board, moves: []const brd.Move, priors_out: []f32) f32 {
+        const nne: *nn.NNEval = @ptrCast(@alignCast(ctx));
+        return nne.eval(b, moves, priors_out);
     }
 
     pub fn onNewGame(self: *Engine, _: usize) anyerror!void {
@@ -53,7 +57,7 @@ pub const Engine = struct {
 
     pub fn onGo(self: *Engine, _: tei.GoParams) anyerror!brd.Move {
         const params = ts.SearchParams{
-            .max_simulations = 5000,
+            .max_simulations = 1000,
             .max_time_ms = 0,
         };
         const move = try self.tree_search.search(&self.board, params);

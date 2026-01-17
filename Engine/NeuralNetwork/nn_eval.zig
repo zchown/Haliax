@@ -67,25 +67,26 @@ pub const NNEval = struct {
         self.runner.deinit();
     }
 
-    /// Matches tree_search.EvalFn signature:
-    /// returns value in [-1,1] from perspective of side to move at this node,
-    /// and fills priors_out per legal move order (generated in tree_search.expand()).
-    pub fn eval(self: *NNEval, board: *const brd.Board, priors_out: []f32) f32 {
-        // Make sure vectors are up to date (caller usually keeps them updated,
-        // but safe if you want: you’d need a mutable board; so we assume updated.)
+    /// Returns value in [-1,1] from perspective of side to move at this node,
+    /// and fills priors_out aligned to `moves`.
+    pub fn eval(self: *NNEval, board: *const brd.Board, moves: []const brd.Move, priors_out: []f32) f32 {
+        if (priors_out.len != moves.len) {
+            // Caller error; fail safe.
+            if (priors_out.len > 0) {
+                const u = 1.0 / @as(f32, @floatFromInt(priors_out.len));
+                for (priors_out) |*p| p.* = u;
+            }
+            return 0.0;
+        }
 
         // Get CHW input from the side-to-move vector.
         const src = if (board.to_move == .White) board.white_vector.data else board.black_vector.data;
         const channels_in_usize = src.len / brd.num_squares;
         const channels_in: i64 = @intCast(channels_in_usize);
 
-        // IMPORTANT: src layout must be CHW flattened (C*36) matching training.
-        // If your vector_board stores HWC per-square, you need to reorder here.
-        // Your current pipeline wrote features exactly as vector.data, so keep consistent.
-
         const value = self.runner.run(
             channels_in,
-            src,
+            &src,
             self.logits_place_pos[0..],
             self.logits_place_type[0..],
             self.logits_slide_from[0..],
@@ -110,30 +111,43 @@ pub const NNEval = struct {
         softmaxInto(self.prob_slide_len[0..], self.logits_slide_len[0..]);
 
         // Map move -> prior probability
-        // NOTE: tree_search.expand() generates moves in the same order as priors_out.
-        // priors_out.len == legal move count.
-        //
-        // For each move:
-        //  Place: pos * type
-        //  Slide: from * dir * pickup * slide_len(popcount)
-        for (priors_out, 0..) |*p, i| {
-            // tree_search passes priors_out pointing at node.priors, but doesn't pass moves.
-            // So this eval() must be called from expand() after node.moves is set.
-            // That’s already the case: node.moves is copied before eval_fn call.
-            // We'll rely on a convention: expand() sets node.moves and then calls eval_fn.
-            //
-            // To access moves here, you’d need them passed in. Since EvalFn signature
-            // doesn’t include moves, you have two options:
-            //   A) Change EvalFn signature to include moves (best)
-            //   B) Compute priors in expand() itself after calling eval_fn that outputs heads
-            //
-            // Because your EvalFn signature is fixed right now, the best minimal change is:
-            //   - keep EvalFn for value only OR for raw head logits
-            //   - compute priors in expand() where node.moves is in scope.
-            //
-            // So: we set dummy here and do the real mapping in expand().
-            _ = i;
-            p.* = 1.0;
+        for (moves, 0..) |mv, i| {
+            const pos_idx: usize = @intCast(mv.position);
+            var p: f32 = 0.0;
+
+            // Place
+            if (mv.pattern == 0) {
+                const t: usize = @intCast(mv.flag);
+                if (pos_idx < 36 and t < 3) {
+                    p = self.prob_place_pos[pos_idx] * self.prob_place_type[t];
+                }
+            } else {
+                // Slide
+                const dir: usize = @intCast(mv.flag);
+                const pickup_i = clampPickupIdx(mv.movedStones());
+                const len_i = slideLenIdx(mv.pattern);
+                if (pos_idx < 36 and dir < 4 and pickup_i < 6 and len_i != null) {
+                    p = self.prob_slide_from[pos_idx] * self.prob_slide_dir[dir] * self.prob_slide_pickup[pickup_i] * self.prob_slide_len[len_i.?];
+                }
+            }
+
+            priors_out[i] = p;
+        }
+
+        // Normalize
+        var sum: f32 = 0.0;
+        for (priors_out) |*p| {
+            if (p.* < 0) p.* = 0;
+            sum += p.*;
+        }
+        if (sum <= 0.0) {
+            if (priors_out.len > 0) {
+                const u = 1.0 / @as(f32, @floatFromInt(priors_out.len));
+                for (priors_out) |*p| p.* = u;
+            }
+        } else {
+            const inv = 1.0 / sum;
+            for (priors_out) |*p| p.* *= inv;
         }
 
         return value;

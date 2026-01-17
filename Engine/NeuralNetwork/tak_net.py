@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import os
 
 class ResidualBlock(nn.Module):
     def __init__(self, c: int):
@@ -61,4 +62,29 @@ def policy_loss(target_pi, logits):
 
 def value_loss(z, v):
     return F.mse_loss(v.squeeze(-1), z)
+
+if __name__ == "__main__":
+    # Simple test
+    model = TakNet(channels_in=26)
+    dummy = torch.randn(1, 26, 6, 6)
+    onnx_path = os.path.join("models", "tak_net.onnx")
+    torch.onnx.export(
+        model,
+        dummy,
+        onnx_path,
+        input_names=["board"],
+        output_names=[
+            "place_pos",
+            "place_type",
+            "slide_from",
+            "slide_dir",
+            "slide_pickup",
+            "slide_len",
+            "value",
+        ],
+        opset_version=18,
+        dynamo=False,
+        dynamic_axes={"board": {0: "batch"}},
+    )
+    print("Wrote", onnx_path)
 

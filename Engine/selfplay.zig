@@ -2,8 +2,13 @@ const std = @import("std");
 const brd = @import("board");
 const mvs = @import("moves");
 const mcts = @import("tree_search");
+const nn = @import("nn_eval");
 
 const magic: []const u8 = "TAKDATA1";
+const search_params = mcts.SearchParams{
+    .max_simulations = 100,
+    .max_time_ms = 0,
+};
 
 const PolicyHeads = struct {
     place_pos: [brd.num_squares]f32,
@@ -128,11 +133,26 @@ fn freeBufferedSteps(allocator: std.mem.Allocator, steps: []BufferedStep) void {
 
 fn computeWinner(board: *brd.Board) ?brd.Color {
     const r = board.checkResult();
-    if (r.ongoing == 1) return null;
+    if (r.ongoing == 1) {
+        if (board.white_vector.data[25 * 36 + 5] > 0) {
+            return brd.Color.White;
+        } else if (board.black_vector.data[25 * 36 + 5] > 0) {
+            return brd.Color.Black;
+        }
+    }
 
-    if (@as(u4, @bitCast(r)) == 0) return null;
+    if (r.road == 1 or r.flat == 1) {
+        if (r.road == 1) {
+            std.debug.print("Road win detected\n", .{});
+        }
+        if (r.color == 1) {
+            return brd.Color.White;
+        } else {
+            return brd.Color.Black;
+        }
+    }
 
-    return if (r.color == 0) brd.Color.White else brd.Color.Black;
+    return null; // draw or ongoing
 }
 
 fn outcomeZFromWinner(to_move: brd.Color, winner: ?brd.Color) f32 {
@@ -154,7 +174,7 @@ pub fn playSelfGameBuffered(
     while (ply < max_plies) : (ply += 1) {
         if (board.checkResult().ongoing == 0) break;
 
-        const mv = try tree_search.search(&board, .{ .max_simulations = 1000, .max_time_ms = 0 });
+        const mv = try tree_search.search(&board, search_params);
 
         const src = if (board.to_move == .White)
             board.white_vector.data
@@ -222,6 +242,12 @@ pub fn playSelfGameBuffered(
     }
 
     const winner = computeWinner(&board);
+
+    std.debug.print("Game finished in {d} plies. Winner: {s}\n", .{
+        ply,
+        if (winner == null) "Draw" else if (winner.? == .White) "White" else "Black",
+    });
+
     return .{
         .steps = try steps.toOwnedSlice(allocator.*),
         .winner = winner,
@@ -253,7 +279,8 @@ pub fn writeSelfPlayDataset(
 
     var written: usize = 0;
 
-    for (0..num_games) |_| {
+    for (0..num_games) |i| {
+        std.debug.print("Playing game {d}/{d}\n", .{ i, num_games });
         const gd = try playSelfGameBuffered(allocator, tree_search, max_plies);
         defer freeBufferedSteps(allocator.*, gd.steps);
 
@@ -282,21 +309,37 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const EvalStub = struct {
-        pub fn eval(board: *const brd.Board, priors_out: []f32) f32 {
-            if (priors_out.len > 0) {
-                const u: f32 = 1.0 / @as(f32, @floatFromInt(priors_out.len));
-                for (priors_out) |*p| p.* = u;
-            }
-            _ = board;
-            return 0.0;
+    //   selfplay <model.onnx> [out_path] [num_games] [max_plies]
+    const args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
+
+    if (args.len < 2) {
+        std.debug.print(
+            "Usage: {s} <model.onnx> [out_path] [num_games] [max_plies]\n",
+            .{args[0]},
+        );
+        return error.MissingModelPath;
+    }
+
+    const model_path = args[1];
+    const out_path: []const u8 = if (args.len >= 3) args[2] else "selfplay.takbin";
+    const num_games: usize = if (args.len >= 4) try std.fmt.parseInt(usize, args[3], 10) else 1000;
+    const max_plies: usize = if (args.len >= 5) try std.fmt.parseInt(usize, args[4], 10) else 256;
+
+    const EvalNN = struct {
+        fn evalThunk(ctx: *anyopaque, board: *const brd.Board, moves: []const brd.Move, priors_out: []f32) f32 {
+            const nne: *nn.NNEval = @ptrCast(@alignCast(ctx));
+            return nne.eval(board, moves, priors_out);
         }
     };
 
     var alloc_copy = allocator;
-    var ts = try mcts.MonteCarloTreeSearch.init(&alloc_copy, EvalStub.eval, false, true);
+    var nn_eval = try nn.NNEval.init(alloc_copy, model_path);
+    defer nn_eval.deinit();
+
+    var ts = try mcts.MonteCarloTreeSearch.init(&alloc_copy, &nn_eval, EvalNN.evalThunk, false, true);
     defer ts.deinit();
 
-    try writeSelfPlayDataset(&alloc_copy, &ts, "selfplay.takbin", 10, 256);
+    try writeSelfPlayDataset(&alloc_copy, &ts, out_path, num_games, max_plies);
 }
 

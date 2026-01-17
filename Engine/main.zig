@@ -10,7 +10,7 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     var allocator = gpa.allocator();
 
-    var eng = try engine.Engine.init(&allocator);
+    var eng = try engine.Engine.init(&allocator, "/Users/zanderchown/ComputerScience/Personal/Haliax/runs/run2/tak_net.onnx");
     defer eng.deinit();
 
     try tei.runTEI(allocator, &eng, "Haliax", "Zander Chown");

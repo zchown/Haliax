@@ -9,7 +9,9 @@ const tps = @import("tps");
 pub const cpuct: f32 = 1.0;
 
 pub const EvalFn = *const fn (
+    ctx: *anyopaque,
     board: *const brd.Board,
+    moves: []const brd.Move,
     priors_out: []f32,
 ) f32;
 
@@ -51,6 +53,7 @@ const Node = struct {
 
 pub const MonteCarloTreeSearch = struct {
     allocator: *std.mem.Allocator,
+    eval_ctx: *anyopaque,
     eval_fn: EvalFn,
 
     move_list: mvs.MoveList,
@@ -64,12 +67,13 @@ pub const MonteCarloTreeSearch = struct {
 
     last_root: ?*RootStats,
 
-    pub fn init(alloc: *std.mem.Allocator, eval_fn: EvalFn, dm: bool, tm: bool) !MonteCarloTreeSearch {
+    pub fn init(alloc: *std.mem.Allocator, eval_ctx: *anyopaque, eval_fn: EvalFn, dm: bool, tm: bool) !MonteCarloTreeSearch {
         var arena = std.heap.ArenaAllocator.init(alloc.*);
         errdefer arena.deinit();
 
         return MonteCarloTreeSearch{
             .allocator = alloc,
+            .eval_ctx = eval_ctx,
             .eval_fn = eval_fn,
             .move_list = try mvs.MoveList.init(alloc, 512),
             .made_move_list = try mvs.MoveList.init(alloc, 512),
@@ -101,14 +105,13 @@ pub const MonteCarloTreeSearch = struct {
         // Keep capacity to avoid churn between searches.
         _ = self.arena.reset(.retain_capacity);
         self.node_map = std.AutoHashMap(zob.ZobristHash, *Node).init(self.arena.allocator());
-
     }
 
     fn terminalValue(board: *brd.Board) ?f32 {
         const r = board.checkResult();
         if (r.ongoing == 1) return null;
 
-        // Draw 
+        // Draw
         if (@as(u4, @bitCast(r)) == 0) return 0.0;
 
         const winner: brd.Color = if (r.color == 0) .White else .Black;
@@ -153,11 +156,9 @@ pub const MonteCarloTreeSearch = struct {
         @memset(node.child_visits, 0);
         @memset(node.child_value_sum, 0.0);
 
-        const value = self.eval_fn(board, node.priors);
-        for (0..node.priors.len) |i| {
-           node.priors[i] = 1.0 / @as(f32, @floatFromInt(count));
-        }
+        const value = self.eval_fn(self.eval_ctx, board, node.moves, node.priors);
 
+        // Keep priors sane (non-negative + normalized), but do NOT overwrite with uniform.
         var sum: f32 = 0.0;
         for (node.priors) |*p| {
             if (p.* < 0) p.* = 0;
@@ -361,7 +362,7 @@ pub const MonteCarloTreeSearch = struct {
 
         var m: brd.Move = undefined;
         if (self.training_mode) {
-            const seed = std.time.milliTimestamp() ^ @as(i64, @intCast(board.zobrist_hash));
+            const seed = std.time.milliTimestamp();
             m = pickBestMoveDebug(root, @as(u64, @intCast(seed)));
         } else {
             m = pickBestMove(root);
@@ -376,19 +377,14 @@ pub const MonteCarloTreeSearch = struct {
                 const q = root.childQ(i);
                 const p = root.priors[i];
                 std.debug.print(
-                "Move: {s}, Visits: {}, Q: {}, P: {}\n",
-                .{try ptn.moveToString(self.allocator, mv), v, q, p}
-            );
+                    "Move: {s}, Visits: {}, Q: {}, P: {}\n",
+                    .{ try ptn.moveToString(self.allocator, mv), v, q, p },
+                );
             }
 
-            std.debug.print("Selected move: {s}\n", .{try ptn.moveToString(self.allocator, m) });
-            // time taken
+            std.debug.print("Selected move: {s}\n", .{try ptn.moveToString(self.allocator, m)});
             std.debug.print("Time taken: {d} ms\n", .{@as(usize, @intCast(end_ms - start_ms))});
         }
-
-        // var s: u64 = @as(u64, @intCast(end_ms));
-        // const i = zob.splitMix64(&s);
-        // return root.moves[@as(usize, i % @as(u64, root.moves.len))];
 
         return m;
     }
