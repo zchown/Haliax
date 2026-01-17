@@ -18,6 +18,11 @@ pub const SearchParams = struct {
     max_time_ms: usize = 0, // 0 means "no time limit"
 };
 
+pub const RootStats = struct {
+    moves: []const brd.Move,
+    visit_counts: []u32,
+};
+
 const Node = struct {
     hash: zob.ZobristHash,
 
@@ -55,8 +60,11 @@ pub const MonteCarloTreeSearch = struct {
     node_map: std.AutoHashMap(zob.ZobristHash, *Node),
 
     debug_mode: bool,
+    training_mode: bool,
 
-    pub fn init(alloc: *std.mem.Allocator, eval_fn: EvalFn, dm: bool) !MonteCarloTreeSearch {
+    last_root: ?*RootStats,
+
+    pub fn init(alloc: *std.mem.Allocator, eval_fn: EvalFn, dm: bool, tm: bool) !MonteCarloTreeSearch {
         var arena = std.heap.ArenaAllocator.init(alloc.*);
         errdefer arena.deinit();
 
@@ -68,6 +76,8 @@ pub const MonteCarloTreeSearch = struct {
             .arena = arena,
             .node_map = std.AutoHashMap(zob.ZobristHash, *Node).init(arena.allocator()),
             .debug_mode = dm,
+            .training_mode = tm,
+            .last_root = null,
         };
     }
 
@@ -75,6 +85,16 @@ pub const MonteCarloTreeSearch = struct {
         self.move_list.deinit();
         self.node_map.deinit();
         self.arena.deinit();
+    }
+
+    pub fn getLastRootStats(self: *MonteCarloTreeSearch) ?RootStats {
+        if (self.last_root) |lr| {
+            return RootStats{
+                .moves = lr.moves,
+                .visit_counts = lr.visit_counts,
+            };
+        }
+        return null;
     }
 
     fn resetSearchState(self: *MonteCarloTreeSearch) void {
@@ -292,6 +312,24 @@ pub const MonteCarloTreeSearch = struct {
         return root.moves[best_i];
     }
 
+    fn pickBestMoveDebug(root: *Node, seed: u64) brd.Move {
+        // choose move with probability proportional to visit count
+        var total_visits: u32 = 0;
+        for (root.child_visits) |v| {
+            total_visits += v;
+        }
+        var s = seed;
+        var r = zob.splitMix64(&s) % @as(u64, total_visits);
+        for (root.moves, 0..) |_, i| {
+            const v = root.child_visits[i];
+            if (@as(u64, v) > r) {
+                return root.moves[i];
+            }
+            r -= @as(u64, v);
+        }
+        return root.moves[0];
+    }
+
     pub fn search(self: *MonteCarloTreeSearch, board: *brd.Board, params: SearchParams) !brd.Move {
         tracy.frameMarkNamed("MCTS Search");
         const tr = tracy.trace(@src());
@@ -321,7 +359,13 @@ pub const MonteCarloTreeSearch = struct {
             }
         }
 
-        const m = pickBestMove(root);
+        var m: brd.Move = undefined;
+        if (self.training_mode) {
+            const seed = std.time.milliTimestamp() ^ @as(i64, @intCast(board.zobrist_hash));
+            m = pickBestMoveDebug(root, @as(u64, @intCast(seed)));
+        } else {
+            m = pickBestMove(root);
+        }
 
         const end_ms: i64 = std.time.milliTimestamp();
 

@@ -54,3 +54,5 @@ temp
 # Coverage
 *.profdata
 *.profraw
+
+third_party/*/

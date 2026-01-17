@@ -282,6 +282,22 @@ pub fn build(b: *std.Build) void {
 
     tei_module.addImport("engine", engine_module);
 
+    const onnxrt_module = b.createModule(.{
+        .root_source_file = b.path("Engine/NeuralNetwork/onnxrt.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const nn_eval_module = b.createModule(.{
+        .root_source_file = b.path("Engine/NeuralNetwork/nn_eval.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    nn_eval_module.addImport("board", board_module);
+    nn_eval_module.addImport("moves", moves_module);
+    nn_eval_module.addImport("onnxrt", onnxrt_module);
+
     const engine = b.addExecutable(.{
         .name = "Haliax",
         .root_module = b.createModule(.{
@@ -304,6 +320,15 @@ pub fn build(b: *std.Build) void {
     engine.root_module.addImport("tree_search", tree_search_module);
     engine.root_module.addImport("tei", tei_module);
     engine.root_module.addImport("engine", engine_module);
+    engine.root_module.addImport("onnxrt", onnxrt_module);
+    engine.root_module.addImport("nn_eval", nn_eval_module);
+
+    engine.addIncludePath(b.path("third_party/onnxruntime/include"));
+    engine.addLibraryPath(b.path("third_party/onnxruntime/lib"));
+    engine.addRPath(b.path("third_party/onnxruntime/lib"));
+    engine.linkSystemLibrary("onnxruntime");
+
+    engine.linkSystemLibrary("onnxruntime");
 
     b.installArtifact(engine);
 
@@ -330,6 +355,54 @@ pub fn build(b: *std.Build) void {
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
         run_cmd.addArgs(args);
+    }
+
+    const self_play = b.addExecutable(.{
+        .name = "selfplay",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("Engine/selfplay.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+        .use_llvm = true,
+    });
+
+    self_play.root_module.addImport("board", board_module);
+    self_play.root_module.addImport("moves", moves_module);
+    self_play.root_module.addImport("ptn", ptn_module);
+    self_play.root_module.addImport("tps", tps_module);
+    self_play.root_module.addImport("zobrist", zobrist_module);
+    self_play.root_module.addImport("sympathy", sympathy_module);
+    self_play.root_module.addImport("tracy", tracy_module);
+    self_play.root_module.addImport("move_generation", move_generation_module);
+    self_play.root_module.addImport("tree_search", tree_search_module);
+    self_play.root_module.addImport("tei", tei_module);
+    self_play.root_module.addImport("engine", engine_module);
+    self_play.root_module.addImport("onnxrt", onnxrt_module);
+    self_play.root_module.addImport("nn_eval", nn_eval_module);
+
+    self_play.addIncludePath(b.path("third_party/onnxruntime/include"));
+    self_play.addLibraryPath(b.path("third_party/onnxruntime/lib"));
+    self_play.addRPath(b.path("third_party/onnxruntime/lib"));
+    self_play.linkSystemLibrary("onnxruntime");
+
+    b.installArtifact(self_play);
+
+    const self_play_options = b.addOptions();
+    self_play.root_module.addOptions("build_options", self_play_options);
+    self_play_options.addOption(bool, "enable_tracy", tracy != null);
+    self_play_options.addOption(bool, "enable_tracy_callstack", tracy_callstack);
+    self_play_options.addOption(bool, "enable_tracy_allocation", tracy_allocation);
+    self_play_options.addOption(u32, "tracy_callstack_depth", tracy_callstack_depth);
+
+    if (tracy) |tracy_path| {
+        const client_cpp = b.pathJoin(&[_][]const u8{ tracy_path, "public", "TracyClient.cpp" });
+        const tracy_c_flags: []const []const u8 = &.{ "-DTRACY_ENABLE=1", "-fno-sanitize=undefined" };
+
+        self_play.root_module.addIncludePath(.{ .cwd_relative = tracy_path });
+        self_play.root_module.addCSourceFile(.{ .file = .{ .cwd_relative = client_cpp }, .flags = tracy_c_flags });
+        self_play.root_module.linkSystemLibrary("c++", .{ .use_pkg_config = .no });
+        self_play.root_module.link_libc = true;
     }
 }
 

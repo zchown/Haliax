@@ -23,7 +23,7 @@ pub const Engine = struct {
             .board = brd.Board.init(),
             .tree_search = undefined,
         };
-        e.tree_search = try ts.MonteCarloTreeSearch.init(allocator, eval, false);
+        e.tree_search = try ts.MonteCarloTreeSearch.init(allocator, eval, false, true);
         return e;
     }
 
