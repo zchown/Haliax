@@ -21,7 +21,7 @@ pub const crush_map_size = 256;
 // whether to use union-find for road detection
 // alternative is flood fill bitboard method
 // slower for 6x6 but might have benefits for eval
-pub const do_road_uf = false;
+pub const do_road_uf = true;
 pub const do_vector_board = false;
 
 pub const StoneType = enum(u2) {

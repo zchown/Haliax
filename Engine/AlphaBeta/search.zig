@@ -457,8 +457,12 @@ pub const Searcher = struct {
             }
         }
 
-        if (self.ply >= max_ply or depth == 0) {
+        if (self.ply >= max_ply) {
             return eval.evaluate(board);
+        }
+
+        if (depth == 0) {
+            return self.quiescence(board, alpha, beta, 4);
         }
 
         if (!is_root) {
@@ -666,11 +670,11 @@ pub const Searcher = struct {
             mvs.makeMove(board, move);
             self.ply += 1;
 
-            // if (move.pattern != 0 and self.isRepetition(board)) {
-            //     return 0;
-            // }
-            // self.hash_history[board.half_move_count] = board.zobrist_hash;
-            // self.place_history[board.half_move_count] = move.pattern != 0;
+            if (move.pattern != 0 and self.isRepetition(board)) {
+                return 0;
+            }
+            self.hash_history[board.half_move_count] = board.zobrist_hash;
+            self.place_history[board.half_move_count] = move.pattern != 0;
 
             self.move_history[self.ply] = move;
 
@@ -810,6 +814,76 @@ pub const Searcher = struct {
         });
 
         return best_score;
+    }
+
+    // Quiescence search: extends the search past depth 0 by considering only
+    // place moves capstone that land on a road-threat or road-block square for either side.  
+    fn quiescence(self: *Searcher, board: *brd.Board, alpha_: i32, beta_: i32, max_q_depth: usize) i32 {
+        const result = board.checkResult();
+        if (result.ongoing == 0) {
+            if (result.road == 0 and result.flat == 0 and result.color == 0) return 0;
+            const winner: brd.Color = if (result.color == 0) .White else .Black;
+            if (winner == board.to_move) {
+                return mate_score - @as(i32, @intCast(self.ply));
+            } else {
+                return -(mate_score - @as(i32, @intCast(self.ply)));
+            }
+        }
+
+        if (self.ply >= max_ply or max_q_depth == 0) {
+            return eval.evaluate(board);
+        }
+
+        self.seldepth = @max(self.seldepth, self.ply);
+
+        const stand_pat = eval.evaluate(board);
+
+        var alpha = alpha_;
+        const beta = beta_;
+
+        if (stand_pat >= beta) return stand_pat;
+        if (stand_pat > alpha) alpha = stand_pat;
+
+        if (!brd.do_road_uf) return alpha;
+
+        const my_threats = computeRoadThreatSquares(board, board.to_move);
+        const opp_threats = computeRoadThreatSquares(board, board.to_move.opposite());
+
+        // Nothing to do if no road is threatened.
+        if (my_threats == 0 and opp_threats == 0) return alpha;
+
+        // Generate candidate place moves.
+        self.move_lists[self.ply].clear();
+        mvs.generatePlaceMoves(board, &self.move_lists[self.ply]) catch unreachable;
+
+        const move_count = self.move_lists[self.ply].count;
+
+        var i: usize = 0;
+        while (i < move_count) : (i += 1) {
+            const m = self.move_lists[self.ply].moves[i];
+
+            // Skip moves that neither threaten nor defend a road.
+            const threatens_road = brd.getBit(my_threats, m.position);
+            const blocks_opp_road = brd.getBit(opp_threats, m.position);
+            if (!threatens_road and !blocks_opp_road) continue;
+
+            self.nodes += 1;
+            mvs.makeMove(board, m);
+            self.ply += 1;
+            self.move_history[self.ply] = m;
+
+            const score = -self.quiescence(board, -beta, -alpha, max_q_depth - 1);
+
+            self.ply -= 1;
+            mvs.undoMove(board, m);
+
+            if (self.time_stop) return 0;
+
+            if (score >= beta) return score;
+            if (score > alpha) alpha = score;
+        }
+
+        return alpha;
     }
 
     fn scoreMoves(self: *Searcher, board: *brd.Board, hash_move: brd.Move) void {
@@ -965,7 +1039,7 @@ pub const Searcher = struct {
         }
     }
 
-    /// Compute destination square for a move (used for history/countermove indexing).
+    // Compute destination square for a move (used for history/countermove indexing).
     fn moveToSq(move: brd.Move) usize {
         if (move.pattern != 0) {
             const dir: brd.Direction = @enumFromInt(move.flag);
