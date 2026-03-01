@@ -6,8 +6,8 @@ const nn = @import("nn_eval");
 
 const magic: []const u8 = "TAKDATA1";
 const search_params = mcts.SearchParams{
-    .max_simulations = 100,
-    .max_time_ms = 0,
+    .max_simulations = 512,
+    .max_time_ms = 100,
 };
 
 const PolicyHeads = struct {
@@ -309,7 +309,7 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    //   selfplay <model.onnx> [out_path] [num_games] [max_plies]
+    //selfplay <model.onnx> [out_path] [num_games] [max_plies]
     const args = try std.process.argsAlloc(allocator);
     defer std.process.argsFree(allocator, args);
 

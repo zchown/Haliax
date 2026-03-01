@@ -35,6 +35,15 @@ pub const RoadUF = struct {
         return uf;
     }
 
+    pub fn copyFrom(self: *RoadUF, other: *const RoadUF) void {
+        @memcpy(&self.parent, &other.parent);
+        @memcpy(&self.rank, &other.rank);
+        @memcpy(&self.active, &other.active);
+        @memcpy(&self.edges, &other.edges);
+        self.has_road_h = other.has_road_h;
+        self.has_road_v = other.has_road_v;
+    }
+
     pub fn clear(self: *RoadUF) void {
         @memset(&self.rank, 0);
         @memset(&self.active, false);

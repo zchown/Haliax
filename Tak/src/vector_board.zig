@@ -2,22 +2,23 @@ const std = @import("std");
 const brd = @import("board");
 const tracy = @import("tracy");
 
-const my_top_layer_offset: usize = 0;
-const opp_top_layer_offset: usize = 3 * brd.board_size * brd.board_size;
+const first_flat_differential_offset: usize = 0;
+const my_top_layer_offset: usize = brd.board_size * brd.board_size;
+const opp_top_layer_offset: usize = 4 * brd.board_size * brd.board_size;
 
-const my_below_layer_offset: usize = 6 * brd.board_size * brd.board_size;
-const opp_below_layer_offset: usize = 12 * brd.board_size * brd.board_size;
+const my_below_layer_offset: usize = 7 * brd.board_size * brd.board_size;
+const opp_below_layer_offset: usize = 13 * brd.board_size * brd.board_size;
 
-const my_reserve_layer_offset: usize = 18 * brd.board_size * brd.board_size;
-const opp_reserve_layer_offset: usize = 20 * brd.board_size * brd.board_size;
+const my_reserve_layer_offset: usize = 19 * brd.board_size * brd.board_size;
+const opp_reserve_layer_offset: usize = 21 * brd.board_size * brd.board_size;
 
-const stack_len_offset: usize = 22 * brd.board_size * brd.board_size;
-const my_covered_flats_offset: usize = 23 * brd.board_size * brd.board_size;
-const their_covered_flats_offset: usize = 24 * brd.board_size * brd.board_size;
+const stack_len_offset: usize = 23 * brd.board_size * brd.board_size;
+const my_covered_flats_offset: usize = 24 * brd.board_size * brd.board_size;
+const their_covered_flats_offset: usize = 25 * brd.board_size * brd.board_size;
 
-const flat_differential_offset: usize = 25 * brd.board_size * brd.board_size;
+const flat_differential_offset: usize = 26 * brd.board_size * brd.board_size;
 
-const total_channels: usize = 26;
+const total_channels: usize = 27;
 const total_inputs: usize = brd.board_size * brd.board_size * total_channels;
 
 pub const BoardState = struct {
@@ -191,6 +192,7 @@ pub const BoardState = struct {
         const flat_diff = my_flat_count - opp_flat_count;
         for (0..brd.num_squares) |pos| {
             self.data[flat_differential_offset + pos] = flat_diff;
+            self.data[first_flat_differential_offset + pos] = flat_diff;
         }
     }
 };

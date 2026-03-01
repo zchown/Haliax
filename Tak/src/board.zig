@@ -21,8 +21,8 @@ pub const crush_map_size = 256;
 // whether to use union-find for road detection
 // alternative is flood fill bitboard method
 // slower for 6x6 but might have benefits for eval
-pub const do_road_uf = false;
-pub const do_vector_board = true;
+pub const do_road_uf = true;
+pub const do_vector_board = false;
 
 pub const StoneType = enum(u2) {
     Flat,
@@ -62,7 +62,7 @@ pub inline fn countBits(bb: Bitboard) u32 {
 }
 
 pub inline fn getLSB(bb: Bitboard) Position {
-    return @ctz(bb);
+    return @truncate(@ctz(bb));
 }
 
 pub inline fn getPositionBB(pos: Position) Bitboard {
@@ -281,6 +281,10 @@ pub inline fn movesEqual(a: Move, b: Move) bool {
         a.pattern == b.pattern;
 }
 
+pub inline fn isNullMove(move: Move) bool {
+    return move.position == 0 and move.flag == 0 and move.pattern == 0;
+}
+
 const SearchDirection = enum {
     Vertical,
     Horizontal,
@@ -314,6 +318,12 @@ pub const Board = struct {
     black_road_uf: road.RoadUF,
     road_dirty_white: bool,
     road_dirty_black: bool,
+
+    white_road_history: [128]road.RoadUF,
+    black_road_history: [128]road.RoadUF,
+    road_dirty_white_history: [128]bool,
+    road_dirty_black_history: [128]bool,
+
     supress_road_incremental: bool,
 
     white_vector: vb.BoardState,
@@ -346,6 +356,10 @@ pub const Board = struct {
             .road_dirty_white = false,
             .road_dirty_black = false,
             .supress_road_incremental = false,
+            .white_road_history = undefined,
+            .black_road_history = undefined,
+            .road_dirty_white_history = undefined,
+            .road_dirty_black_history = undefined,
             .white_vector = vb.BoardState.init(.White),
             .black_vector = vb.BoardState.init(.Black),
         };

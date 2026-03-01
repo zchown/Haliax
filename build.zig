@@ -266,6 +266,39 @@ pub fn build(b: *std.Build) void {
 
     tree_search_module.addImport("tei", tei_module);
 
+    const alpha_beta_module = b.createModule(.{
+        .root_source_file = b.path("Engine/AlphaBeta/search.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    alpha_beta_module.addImport("board", board_module);
+    alpha_beta_module.addImport("moves", moves_module);
+    alpha_beta_module.addImport("tracy", tracy_module);
+    alpha_beta_module.addImport("zobrist", zobrist_module);
+
+    const evaluation_module = b.createModule(.{
+        .root_source_file = b.path("Engine/AlphaBeta/evaluate.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    evaluation_module.addImport("board", board_module);
+    evaluation_module.addImport("tracy", tracy_module);
+
+    alpha_beta_module.addImport("evaluate", evaluation_module);
+
+    const transposition_module = b.createModule(.{
+        .root_source_file = b.path("Engine/AlphaBeta/transposition_table.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    transposition_module.addImport("board", board_module);
+    transposition_module.addImport("zobrist", zobrist_module);
+
+    alpha_beta_module.addImport("transposition", transposition_module);
+
     const engine_module = b.createModule(.{
         .root_source_file = b.path("Engine/engine.zig"),
         .target = target,
@@ -279,8 +312,13 @@ pub fn build(b: *std.Build) void {
     engine_module.addImport("tei", tei_module);
     engine_module.addImport("tree_search", tree_search_module);
     engine_module.addImport("tracy", tracy_module);
+    engine_module.addImport("alpha_beta", alpha_beta_module);
+    engine_module.addImport("evaluate", evaluation_module);
+    engine_module.addImport("search", alpha_beta_module);
+    engine_module.addImport("transposition", transposition_module);
 
     tei_module.addImport("engine", engine_module);
+    tei_module.addImport("transposition", transposition_module);
 
     const onnxrt_module = b.createModule(.{
         .root_source_file = b.path("Engine/NeuralNetwork/onnxrt.zig"),

@@ -6,7 +6,82 @@ const mvs = @import("moves");
 const ptn = @import("ptn");
 const tps = @import("tps");
 
-pub const cpuct: f32 = 1.0;
+pub const cpuct: f32 = 1.5;
+
+pub const root_dirichlet_alpha: f32 = 0.3;
+pub const root_dirichlet_epsilon: f32 = 0.25;
+pub const root_noise_plies: usize = 6;
+
+
+fn sampleGamma(rng: std.Random, k: f32) f32 {
+    if (k <= 0.0) return 0.0;
+
+    if (k < 1.0) {
+        const u = rng.float(f32);
+        return sampleGamma(rng, k + 1.0) * std.math.pow(f32, u, 1.0 / k);
+    }
+
+    const d = k - 1.0 / 3.0;
+    const c = 1.0 / std.math.sqrt(9.0 * d);
+
+    while (true) {
+        const x = rng.floatNorm(f32);
+        const v0 = 1.0 + c * x;
+        if (v0 <= 0.0) continue;
+        const v = v0 * v0 * v0;
+
+        const u = rng.float(f32);
+        if (u < 1.0 - 0.0331 * (x * x) * (x * x)) return d * v;
+        if (std.math.log(f32, 10, u) < 0.5 * x * x + d * (1.0 - v + std.math.log(f32, 10, v))) return d * v;
+    }
+}
+
+fn addRootDirichletNoise(
+    priors: []f32,
+    seed: u64,
+    alpha: f32,
+    epsilon: f32,
+) void {
+    if (priors.len == 0) return;
+
+    var prng = std.Random.DefaultPrng.init(seed);
+    const rng = prng.random();
+
+    var sum: f32 = 0.0;
+
+    var noise_buf_stack: [512]f32 = undefined;
+    var noise: []f32 = &noise_buf_stack;
+
+    if (priors.len > noise_buf_stack.len) {
+        // Too many priors to fit on stack; skip noise addition.
+        return;
+    }
+    noise = noise_buf_stack[0..priors.len];
+
+    for (noise, 0..) |*n, i| {
+        _ = i;
+        const g = sampleGamma(rng, alpha);
+        n.* = g;
+        sum += g;
+    }
+    if (sum <= 0.0) return;
+
+    const inv = 1.0 / sum;
+    for (noise) |*n| n.* *= inv;
+
+    const one_minus = 1.0 - epsilon;
+    for (priors, 0..) |*p, i| {
+        p.* = one_minus * p.* + epsilon * noise[i];
+        if (p.* < 0.0) p.* = 0.0;
+    }
+
+    var s2: f32 = 0.0;
+    for (priors) |p| s2 += p;
+    if (s2 > 0.0) {
+        const inv2 = 1.0 / s2;
+        for (priors) |*p| p.* *= inv2;
+    }
+}
 
 pub const EvalFn = *const fn (
     ctx: *anyopaque,
@@ -87,6 +162,7 @@ pub const MonteCarloTreeSearch = struct {
 
     pub fn deinit(self: *MonteCarloTreeSearch) void {
         self.move_list.deinit();
+        self.made_move_list.deinit();
         self.node_map.deinit();
         self.arena.deinit();
     }
@@ -313,7 +389,7 @@ pub const MonteCarloTreeSearch = struct {
         return root.moves[best_i];
     }
 
-    fn pickBestMoveDebug(root: *Node, seed: u64) brd.Move {
+    fn pickBestMoveTraining(root: *Node, seed: u64) brd.Move {
         // choose move with probability proportional to visit count
         var total_visits: u32 = 0;
         for (root.child_visits) |v| {
@@ -342,6 +418,16 @@ pub const MonteCarloTreeSearch = struct {
 
         if (!root.expanded) _ = try self.expand(root, board);
 
+        if (self.training_mode and board.half_move_count < root_noise_plies) {
+            const seed = std.time.milliTimestamp() ^ (@as(i64, @bitCast(board.zobrist_hash)));
+            addRootDirichletNoise(
+                root.priors,
+                @as(u64, @intCast(seed)),
+                root_dirichlet_alpha,
+                root_dirichlet_epsilon,
+            );
+        }
+
         const start_ms: i64 = std.time.milliTimestamp();
         var sims: usize = 0;
 
@@ -362,8 +448,8 @@ pub const MonteCarloTreeSearch = struct {
 
         var m: brd.Move = undefined;
         if (self.training_mode) {
-            const seed = std.time.milliTimestamp();
-            m = pickBestMoveDebug(root, @as(u64, @intCast(seed)));
+            const seed = std.time.milliTimestamp() ^ (@as(i64, @bitCast(board.zobrist_hash)));
+            m = pickBestMoveTraining(root, @as(u64, @intCast(seed)));
         } else {
             m = pickBestMove(root);
         }

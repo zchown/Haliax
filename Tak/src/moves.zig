@@ -194,6 +194,13 @@ pub fn makeMove(board: *brd.Board, move: brd.Move) void {
     // const z = tracy.trace(@src());
     // defer z.end();
 
+    if (brd.do_road_uf) {
+        board.white_road_history[board.half_move_count].copyFrom(&board.white_road_uf);
+        board.black_road_history[board.half_move_count].copyFrom(&board.black_road_uf);
+        board.road_dirty_white_history[board.half_move_count] = board.road_dirty_white;
+        board.road_dirty_black_history[board.half_move_count] = board.road_dirty_black;
+    }
+
     board.zobrist_hash ^= zob.zobrist_turn_hash;
 
     var did_crush: bool = false;
@@ -414,8 +421,6 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
 
     if (brd.do_road_uf) {
         board.supress_road_incremental = true;
-        board.road_dirty_white = true;
-        board.road_dirty_black = true;
     }
 
     defer {
@@ -424,6 +429,10 @@ pub fn undoMove(board: *brd.Board, move: brd.Move) void {
         board.crushMoves[board.half_move_count % brd.crush_map_size] = .NoCrush;
         if (brd.do_road_uf) {
             board.supress_road_incremental = false;
+            board.white_road_uf.copyFrom(&board.white_road_history[board.half_move_count]);
+            board.black_road_uf.copyFrom(&board.black_road_history[board.half_move_count]);
+            board.road_dirty_white = board.road_dirty_white_history[board.half_move_count];
+            board.road_dirty_black = board.road_dirty_black_history[board.half_move_count];
         }
     }
 

@@ -147,14 +147,14 @@ class TakBinDataset(IterableDataset):
                 b = f.read(4 * n)
                 if len(b) != 4 * n:
                     raise EOFError("Truncated record")
-                return np.frombuffer(b, dtype=np.float32)
+                return np.frombuffer(b, dtype=np.float32).copy()
 
             while True:
                 buf = f.read(4 * feat_n)
                 if not buf:
                     break
 
-                x = np.frombuffer(buf, dtype=np.float32).reshape(BOARD_N, BOARD_N, channels_in)
+                x = np.frombuffer(buf, dtype=np.float32).reshape(BOARD_N, BOARD_N, channels_in).copy()
 
                 t_place_pos = read_arr(36)
                 t_place_type = read_arr(3)

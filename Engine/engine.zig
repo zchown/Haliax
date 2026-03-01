@@ -3,70 +3,95 @@ const brd = @import("board");
 const mvs = @import("moves");
 const tps = @import("tps");
 const ptn = @import("ptn");
-const tei = @import("tei");
-const ts = @import("tree_search");
-const nn = @import("nn_eval");
-const tracy = @import("tracy");
+const zob = @import("zobrist");
+const srch = @import("search");
+const tt = @import("transposition");
 
-const prior_count = 16;
+const start_pos_tps = "[TPS x6/x6/x6/x6/x6/x6 1 1]";
 
 pub const Engine = struct {
-    allocator: *std.mem.Allocator,
     board: brd.Board,
-    tree_search: ts.MonteCarloTreeSearch,
-    nn_eval: nn.NNEval,
+    allocator: *std.mem.Allocator,
+    searcher: *srch.Searcher,
+    tt_table: tt.TranspositionTable,
+    hash_size_mb: usize = 64,
+    is_searching: bool = false,
 
-    pub fn init(
-        allocator: *std.mem.Allocator,
-        model_path: []const u8,
-    ) !Engine {
-        var e = Engine{
-            .allocator = allocator,
+    pub fn init(allocator: *std.mem.Allocator) !Engine {
+        const searcher_ptr = try allocator.create(srch.Searcher);
+        errdefer allocator.destroy(searcher_ptr);
+
+        searcher_ptr.* = srch.Searcher{};
+        searcher_ptr.initInPlace();
+
+        var engine = Engine{
             .board = brd.Board.init(),
-            .tree_search = undefined,
-            .nn_eval = undefined,
+            .allocator = allocator,
+            .searcher = searcher_ptr,
+            .tt_table = try tt.TranspositionTable.init(allocator, 64),
         };
 
-        e.nn_eval = try nn.NNEval.init(allocator.*, model_path);
+        engine.searcher.tt_table = &engine.tt_table;
 
-        e.tree_search = try ts.MonteCarloTreeSearch.init(allocator, &e.nn_eval, evalThunk, false, false);
-        return e;
+        srch.quiet_lmr = srch.initQuietLMR();
+
+        return engine;
     }
 
     pub fn deinit(self: *Engine) void {
-        self.tree_search.deinit();
-        self.nn_eval.deinit();
+        self.searcher.deinit();
+        self.allocator.destroy(self.searcher);
+        self.tt_table.deinit(self.allocator);
     }
 
-    fn evalThunk(ctx: *anyopaque, b: *const brd.Board, moves: []const brd.Move, priors_out: []f32) f32 {
-        const nne: *nn.NNEval = @ptrCast(@alignCast(ctx));
-        return nne.eval(b, moves, priors_out);
-    }
-
-    pub fn onNewGame(self: *Engine, _: usize) anyerror!void {
+    pub fn onNewGame(self: *Engine, size: usize) !void {
+        _ = size;
         self.board.reset();
+        self.tt_table.reset();
+        self.searcher.resetHeuristics(true);
     }
 
-    pub fn onSetPosition(self: *Engine, tps_str: []const u8) anyerror!void {
+    pub fn onSetPosition(self: *Engine, tps_str: []const u8) !void {
         try tps.updateBoardFromTPS(&self.board, tps_str);
     }
 
-    pub fn onApplyMove(self: *Engine, m: brd.Move) anyerror!void {
-        mvs.makeMove(&self.board, m);
-    }
-
-    pub fn onGo(self: *Engine, _: tei.GoParams) anyerror!brd.Move {
-        const params = ts.SearchParams{
-            .max_simulations = 1000,
-            .max_time_ms = 0,
-        };
-        const move = try self.tree_search.search(&self.board, params);
+    pub fn onApplyMove(self: *Engine, move: brd.Move) !void {
         mvs.makeMove(&self.board, move);
-        return move;
     }
 
-    pub fn onStop(_: *Engine) void {
-        // IGNORE
+    pub fn onGo(self: *Engine, params: anytype) !brd.Move {
+        self.is_searching = true;
+        defer self.is_searching = false;
+
+        const time_alloc = srch.calculateTimeAllocation(
+            if (@hasField(@TypeOf(params), "wtime_ms")) params.wtime_ms else null,
+            if (@hasField(@TypeOf(params), "btime_ms")) params.btime_ms else null,
+            if (@hasField(@TypeOf(params), "winc_ms")) params.winc_ms else null,
+            if (@hasField(@TypeOf(params), "binc_ms")) params.binc_ms else null,
+            if (@hasField(@TypeOf(params), "movetime_ms")) params.movetime_ms else null,
+            self.board.to_move,
+        );
+
+        self.searcher.max_ms = time_alloc.max_ms;
+        self.searcher.ideal_ms = time_alloc.ideal_ms;
+        self.searcher.stop = false;
+        self.searcher.force_think = false;
+
+        const max_depth: ?u8 = if (@hasField(@TypeOf(params), "depth"))
+            if (params.depth) |d| @as(u8, @intCast(d)) else null
+        else
+            null;
+
+        if (@hasField(@TypeOf(params), "nodes")) {
+            self.searcher.max_nodes = params.nodes;
+        }
+
+        const result = try self.searcher.iterativeDeepening(&self.board, max_depth);
+        return result.move;
+    }
+
+    pub fn onStop(self: *Engine) void {
+        self.searcher.stop = true;
+        tt.stop_signal.store(true, .release);
     }
 };
-

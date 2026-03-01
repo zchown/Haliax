@@ -4,6 +4,8 @@ zig-out/
 .zig-cache/
 
 .venv/
+venv/
+*.tgz
 
 # Build outputs
 *.o
@@ -49,6 +51,8 @@ temp
 **/temp
 *.tmp
 *.temp
+**/temp.zig
+**/temp.*
 
 # Logs
 *.log

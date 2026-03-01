@@ -1,0 +1,234 @@
+const std = @import("std");
+const brd = @import("board");
+const zob = @import("zobrist");
+
+pub const default_tt_size_mb = 64;
+pub const kb = 1 << 10;
+pub const mb = 1 << 20;
+
+pub const EstimationType = enum(u2) {
+    None = 0,
+    Under = 1,
+    Over = 2,
+    Exact = 3,
+};
+
+pub const Entry = struct {
+    hash: zob.ZobristHash = 0,
+    eval: i32 = 0,
+    move: brd.Move = null_move,
+    flag: EstimationType = .None,
+    depth: u8 = 0,
+    age: u8 = 0,
+};
+
+pub const PackedEntry = extern struct {
+    data: u128,
+
+    pub inline fn pack(
+        hash: zob.ZobristHash,
+        eval_val: i32,
+        move: brd.Move,
+        flag: EstimationType,
+        depth: u8,
+        age: u8,
+    ) PackedEntry {
+        const hash_key: u32 = @truncate(hash);
+        const clamped_eval: i16 = @intCast(@max(-32768, @min(32767, eval_val)));
+        const eval_bits: u16 = @bitCast(clamped_eval);
+        const move_bits: u16 = @bitCast(move);
+
+        var packed_entry: u128 = 0;
+        packed_entry |= @as(u128, hash_key); //  0-31
+        packed_entry |= @as(u128, eval_bits) << 32; // 32-47
+        packed_entry |= @as(u128, move_bits) << 48; // 48-63
+        packed_entry |= @as(u128, @intFromEnum(flag)) << 64; // 64-65
+        packed_entry |= @as(u128, depth) << 66; // 66-73
+        packed_entry |= @as(u128, age) << 74; // 74-81
+
+        return PackedEntry{ .data = packed_entry };
+    }
+
+    pub inline fn unpack(self: PackedEntry, full_hash: zob.ZobristHash) Entry {
+        const eval_bits: u16 = @truncate(self.data >> 32);
+        const eval_val: i16 = @bitCast(eval_bits);
+        const move_bits: u16 = @truncate(self.data >> 48);
+        const flag_bits: u2 = @truncate(self.data >> 64);
+        const depth: u8 = @truncate(self.data >> 66);
+        const age: u8 = @truncate(self.data >> 74);
+
+        return Entry{
+            .hash = full_hash,
+            .eval = @as(i32, eval_val),
+            .move = @bitCast(move_bits),
+            .flag = @enumFromInt(flag_bits),
+            .depth = depth,
+            .age = age,
+        };
+    }
+
+    pub inline fn getHashKey(self: PackedEntry) u32 {
+        return @truncate(self.data);
+    }
+
+    pub inline fn verify(self: PackedEntry, full_hash: zob.ZobristHash) bool {
+        const stored_key: u32 = @truncate(self.data);
+        const hash_key: u32 = @truncate(full_hash);
+        return stored_key == hash_key;
+    }
+
+    pub inline fn getFlag(self: PackedEntry) EstimationType {
+        const flag_bits: u2 = @truncate(self.data >> 64);
+        return @enumFromInt(flag_bits);
+    }
+
+    pub inline fn getDepth(self: PackedEntry) u8 {
+        return @truncate(self.data >> 66);
+    }
+
+    pub inline fn getAge(self: PackedEntry) u8 {
+        return @truncate(self.data >> 74);
+    }
+};
+
+const null_move = brd.Move{ .position = 0, .flag = 0, .pattern = 0 };
+
+pub var stop_signal: std.atomic.Value(bool) = std.atomic.Value(bool).init(false);
+
+pub const TranspositionTable = struct {
+    items: []std.atomic.Value(u128),
+    size: usize,
+    age: std.atomic.Value(u8),
+
+    pub fn init(allocator: *std.mem.Allocator, size_in_mb: usize) !TranspositionTable {
+        const raw_num_entries = (size_in_mb * mb) / @sizeOf(u128);
+        const num_entries: usize = std.math.floorPowerOfTwo(usize, raw_num_entries);
+
+        const items = try allocator.alloc(std.atomic.Value(u128), num_entries);
+        for (items) |*item| {
+            item.* = std.atomic.Value(u128).init(0);
+        }
+
+        return TranspositionTable{
+            .items = items,
+            .size = num_entries,
+            .age = std.atomic.Value(u8).init(0),
+        };
+    }
+
+    pub fn deinit(self: *TranspositionTable, allocator: *std.mem.Allocator) void {
+        allocator.free(self.items);
+    }
+
+    pub inline fn clear(self: *TranspositionTable) void {
+        for (self.items) |*item| {
+            item.store(0, .monotonic);
+        }
+    }
+
+    pub inline fn reset(self: *TranspositionTable) void {
+        self.clear();
+        self.age.store(0, .monotonic);
+    }
+
+    pub inline fn index(self: *const TranspositionTable, hash: zob.ZobristHash) usize {
+        return @as(usize, hash) & (self.size - 1);
+    }
+
+    pub inline fn incrementAge(self: *TranspositionTable) void {
+        const old_age = self.age.load(.monotonic);
+        self.age.store(old_age +% 1, .monotonic);
+    }
+
+    pub inline fn getAge(self: *const TranspositionTable) u8 {
+        return self.age.load(.monotonic);
+    }
+
+    pub inline fn set(self: *TranspositionTable, entry: Entry) void {
+        const idx = self.index(entry.hash);
+        const current_packed_data = self.items[idx].load(.acquire);
+        const current_packed = PackedEntry{ .data = current_packed_data };
+        const current_age = self.getAge();
+
+        const hash_matches = current_packed.verify(entry.hash);
+        const should_replace =
+            entry.flag == .Exact or
+            !hash_matches or
+            current_packed.getDepth() <= entry.depth + 4 or
+            current_packed.getAge() != current_age;
+
+        if (should_replace) {
+            const new_packed = PackedEntry.pack(
+                entry.hash,
+                entry.eval,
+                entry.move,
+                entry.flag,
+                entry.depth,
+                current_age,
+            );
+            self.items[idx].store(new_packed.data, .release);
+        }
+    }
+
+    pub inline fn store(self: *TranspositionTable, entry: Entry) void {
+        const idx = self.index(entry.hash);
+        const current_age = self.getAge();
+
+        const packed_entry = PackedEntry.pack(
+            entry.hash,
+            entry.eval,
+            entry.move,
+            entry.flag,
+            entry.depth,
+            current_age,
+        );
+        self.items[idx].store(packed_entry.data, .release);
+    }
+
+    pub inline fn prefetch(self: *const TranspositionTable, hash: zob.ZobristHash) void {
+        const idx = self.index(hash);
+        const ptr = &self.items[idx];
+        @prefetch(ptr, .{
+            .rw = .read,
+            .locality = 1,
+            .cache = .data,
+        });
+    }
+
+    pub fn get(self: *const TranspositionTable, hash: zob.ZobristHash) ?Entry {
+        const idx = self.index(hash);
+        const packed_data = self.items[idx].load(.acquire);
+        const packed_entry = PackedEntry{ .data = packed_data };
+
+        const flag = packed_entry.getFlag();
+        if (packed_entry.verify(hash) and flag != .None) {
+            return packed_entry.unpack(hash);
+        }
+        return null;
+    }
+
+    pub fn getFillPermill(self: *const TranspositionTable) usize {
+        const sample_size = @min(@as(usize, 1000), self.size);
+        var used: usize = 0;
+
+        var i: usize = 0;
+        while (i < sample_size) : (i += 1) {
+            const idx = (i * self.size) / sample_size;
+            const packed_data = self.items[idx].load(.monotonic);
+            const packed_entry = PackedEntry{ .data = packed_data };
+            if (packed_entry.getFlag() != .None) {
+                used += 1;
+            }
+        }
+        return (used * 1000) / sample_size;
+    }
+};
+
+comptime {
+    if (@sizeOf(u128) != 16) {
+        @compileError("u128 must be 16 bytes for atomic operations");
+    }
+    if (@sizeOf(PackedEntry) != 16) {
+        @compileError("PackedEntry must be 16 bytes for atomic operations");
+    }
+}

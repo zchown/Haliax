@@ -73,16 +73,16 @@ fn perftGenerator(allocator: *std.mem.Allocator, board: *brd.Board, depth: usize
 
     var nodes: usize = 0;
 
-    if (depth == 0) {
-        return 1;
-    }
-
+    // if (depth == 0) {
+    //     return 1;
+    // }
+    //
     if (board.checkResult().ongoing != 1) {
-        // std.debug.print("Game over detected at depth {d}\n", .{depth});
+    //     // std.debug.print("Game over detected at depth {d}\n", .{depth});
         return 0;
     }
 
-    // if (depth == 1) return mvs.countMoves(board);
+    if (depth == 1) return mvs.countMoves(board);
 
     var generator = gen.MoveGenerator.initDefault(board);
 

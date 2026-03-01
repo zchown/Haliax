@@ -47,7 +47,11 @@ def main():
             "Selfplay must handle no-model or you must create an initial model."
         )
 
-    resume_ckpt = None
+    # Resume from the last promoted checkpoint if present.
+    # train.py writes a stable "latest.pt" every run, so we prefer that.
+    resume_ckpt = str((best_dir / "latest.pt").resolve())
+    if not Path(resume_ckpt).exists():
+        resume_ckpt = None
 
     for it in range(args.iters):
         print(f"\n=== ITER {it} ===")
@@ -78,9 +82,7 @@ def main():
 
         # ---- concat into one dataset ----
         dataset_path = (runs_dir / f"selfplay_iter{it}.takbin").resolve()
-        run(
-            ["python", str(concat_py), "--out", str(dataset_path)] + chunk_paths
-        )
+        run(["python", str(concat_py), "--out", str(dataset_path)] + chunk_paths)
 
         out_dir = (runs_dir / f"iter{it}").resolve()
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -98,16 +100,22 @@ def main():
         if resume_ckpt:
             train_cmd += ["--resume", resume_ckpt]
         if args.device:
-            train_cmd += ["--device", args.device]
+            train_cmd += ["--device", str(args.device)]
 
         run(train_cmd)
 
-        resume_ckpt = str((out_dir / f"ckpt_{args.train_steps}.pt").resolve())
+        # Always resume from a stable filename rather than guessing the step.
+        resume_ckpt = str((out_dir / "latest.pt").resolve())
 
         new_onnx = (out_dir / "tak_net.onnx").resolve()
         if new_onnx.exists():
             best_onnx.write_bytes(new_onnx.read_bytes())
             print("Promoted", new_onnx, "->", best_onnx)
+
+            # Also promote the latest checkpoint so the loop can be restarted cleanly.
+            latest_pt = (out_dir / "latest.pt").resolve()
+            if latest_pt.exists():
+                (best_dir / "latest.pt").write_bytes(latest_pt.read_bytes())
 
 if __name__ == "__main__":
     main()

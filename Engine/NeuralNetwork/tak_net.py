@@ -19,7 +19,7 @@ class ResidualBlock(nn.Module):
         return x
 
 class TakNet(nn.Module):
-    def __init__(self, channels_in: int, trunk_channels: int = 64, blocks: int = 8):
+    def __init__(self, channels_in: int=27, trunk_channels: int = 128, blocks: int = 6):
         super().__init__()
         self.stem = nn.Sequential(
             nn.Conv2d(channels_in, trunk_channels, 3, padding=1, bias=False),
@@ -29,17 +29,17 @@ class TakNet(nn.Module):
         self.blocks = nn.Sequential(*[ResidualBlock(trunk_channels) for _ in range(blocks)])
         self.fc = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(trunk_channels * 6 * 6, 256),
+            nn.Linear(trunk_channels * 6 * 6, 128),
             nn.ReLU(inplace=True),
         )
 
-        self.place_pos     = nn.Linear(256, 36)
-        self.place_type    = nn.Linear(256, 3)
-        self.slide_from    = nn.Linear(256, 36)
-        self.slide_dir     = nn.Linear(256, 4)
-        self.slide_pickup  = nn.Linear(256, 6)
-        self.slide_len     = nn.Linear(256, 6)
-        self.value         = nn.Linear(256, 1)
+        self.place_pos     = nn.Linear(128, 36)
+        self.place_type    = nn.Linear(128, 3)
+        self.slide_from    = nn.Linear(128, 36)
+        self.slide_dir     = nn.Linear(128, 4)
+        self.slide_pickup  = nn.Linear(128, 6)
+        self.slide_len     = nn.Linear(128, 6)
+        self.value         = nn.Linear(128, 1)
 
     def forward(self, x):
         # x: NCHW
@@ -65,8 +65,8 @@ def value_loss(z, v):
 
 if __name__ == "__main__":
     # Simple test
-    model = TakNet(channels_in=26)
-    dummy = torch.randn(1, 26, 6, 6)
+    model = TakNet(channels_in=27)
+    dummy = torch.randn(1, 27, 6, 6)
     onnx_path = os.path.join("models", "tak_net.onnx")
     torch.onnx.export(
         model,
@@ -84,7 +84,6 @@ if __name__ == "__main__":
         ],
         opset_version=18,
         dynamo=False,
-        dynamic_axes={"board": {0: "batch"}},
     )
     print("Wrote", onnx_path)
 
