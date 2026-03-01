@@ -13,7 +13,7 @@ pub const max_game_ply: usize = 1024;
 pub const mate_score: i32 = 888888;
 pub const mate_threshold: i32 = mate_score - 256;
 
-pub var aspiration_window: i32 = 50;
+pub var aspiration_window: i32 = 25;
 
 pub var rfp_depth: i32 = 6;
 pub var rfp_mul: i32 = 75;
@@ -213,6 +213,9 @@ pub const Searcher = struct {
     double_extensions: [max_ply]i32 = undefined,
     correction: [2][16384]i32 = undefined,
 
+    hash_history: [max_game_ply]zob.ZobristHash = undefined,
+    place_history: [max_game_ply]bool = undefined,
+
     thread_id: usize = 0,
     root_board: *brd.Board = undefined,
     silent_output: bool = false,
@@ -347,11 +350,11 @@ pub const Searcher = struct {
                 if (score <= alpha) {
                     beta = @divTrunc(alpha + beta, 2);
                     alpha = @max(alpha - delta, -mate_score);
-                    delta = @min(delta * 2, mate_score);
+                    delta = @min(delta * 4, mate_score);
                     window_failed = false;
                 } else if (score >= beta) {
                     beta = @min(beta + delta, mate_score);
-                    delta = @min(delta * 2, mate_score);
+                    delta = @min(delta * 4, mate_score);
                     window_failed = true;
                 } else {
                     window_failed = false;
@@ -612,13 +615,20 @@ pub const Searcher = struct {
                 }
             }
 
+            if (!on_pv and effective_depth <= 6 and moves_searched > 0 and
+            !is_road_critical and !is_crush and best_score > -mate_threshold)
+        {
+                const lmp_threshold: i32 = 5 + 2 * @as(i32, @intCast(effective_depth * effective_depth));
+                if (@as(i32, @intCast(moves_searched)) >= lmp_threshold) break;
+            }
+
             var extension: i32 = 0;
 
             if (is_crush) {
                 extension = 1;
             }
 
-            if (extension == 0 and is_road_critical) {
+            if (is_road_critical) {
                 extension = 1;
             }
 
@@ -655,6 +665,13 @@ pub const Searcher = struct {
 
             mvs.makeMove(board, move);
             self.ply += 1;
+
+            // if (move.pattern != 0 and self.isRepetition(board)) {
+            //     return 0;
+            // }
+            // self.hash_history[board.half_move_count] = board.zobrist_hash;
+            // self.place_history[board.half_move_count] = move.pattern != 0;
+
             self.move_history[self.ply] = move;
 
             self.double_extensions[self.ply] = self.double_extensions[self.ply - 1] +
@@ -896,7 +913,6 @@ pub const Searcher = struct {
                     const pickup: usize = @popCount(m.pattern);
                     score = self.history[color_idx][from_sq][to_sq][pickup];
 
-                    // Stack ownership bonus
                     if (board.to_move == .White) {
                         score += @as(i32, @intCast(board.squares[from_sq].white_count)) * @as(i32, @intCast(pickup));
                     } else {
@@ -949,6 +965,7 @@ pub const Searcher = struct {
         }
     }
 
+    /// Compute destination square for a move (used for history/countermove indexing).
     fn moveToSq(move: brd.Move) usize {
         if (move.pattern != 0) {
             const dir: brd.Direction = @enumFromInt(move.flag);
@@ -983,6 +1000,7 @@ pub const Searcher = struct {
         self.history[color_idx][from_sq][to_sq][pickup_idx] = current + delta - @divTrunc(current * @as(i32, @intCast(@abs(delta))), 16384);
     }
 
+    /// Store the countermove: "move" refuted the opponent's previous move.
     fn updateCountermove(self: *Searcher, move: brd.Move) void {
         if (self.ply == 0) return;
         const prev = self.move_history[self.ply];
@@ -1035,6 +1053,22 @@ pub const Searcher = struct {
 
         stdout.print("\n", .{}) catch return;
         stdout.flush() catch return;
+    }
+
+    fn isRepetition(self: *Searcher, board: *brd.Board) bool {
+        var i = board.half_move_count - 2;
+        while (i >= 0) : (i -= 1) {
+            if (!self.place_history[i]) {
+                break;
+            }
+
+            i -= 1;
+
+            if (board.zobrist_hash == self.hash_history[i]) {
+                return true;
+            }
+        }
+        return false;
     }
 };
 

@@ -21,7 +21,7 @@ pub const crush_map_size = 256;
 // whether to use union-find for road detection
 // alternative is flood fill bitboard method
 // slower for 6x6 but might have benefits for eval
-pub const do_road_uf = true;
+pub const do_road_uf = false;
 pub const do_vector_board = false;
 
 pub const StoneType = enum(u2) {
@@ -407,33 +407,33 @@ pub const Board = struct {
         self.black_vector.recomputeSquare(self, pos);
     }
 
-    pub fn recomputeReservesVector(self: *Board) void {
+    pub inline fn recomputeReservesVector(self: *Board) void {
         if (!do_vector_board) return;
         self.white_vector.recomputeReserves(self);
         self.black_vector.recomputeReserves(self);
     }
 
-    pub fn recomputeFlatDiffVector(self: *Board) void {
+    pub inline fn recomputeFlatDiffVector(self: *Board) void {
         if (!do_vector_board) return;
         self.white_vector.recomputeFlatDiff(self);
         self.black_vector.recomputeFlatDiff(self);
     }
 
-    pub fn placeMoveUpdateVectors(self: *Board, pos: Position, p: Piece) void {
+    pub inline fn placeMoveUpdateVectors(self: *Board, pos: Position, p: Piece) void {
         if (!do_vector_board) return;
         self.white_vector.placeMoveUpdate(pos, p);
         self.black_vector.placeMoveUpdate(pos, p);
         self.recomputeReservesVector();
     }
 
-    pub fn placeMoveUndoVectors(self: *Board, pos: Position) void {
+    pub inline fn placeMoveUndoVectors(self: *Board, pos: Position) void {
         if (!do_vector_board) return;
         self.white_vector.placeMoveUndo(pos);
         self.black_vector.placeMoveUndo(pos);
         self.recomputeReservesVector();
     }
 
-    pub fn updateAllVectors(self: *Board) void {
+    pub inline fn updateAllVectors(self: *Board) void {
         if (!do_vector_board) return;
         for (0..num_squares) |pos| {
             self.recomputeSquareVector(@intCast(pos));

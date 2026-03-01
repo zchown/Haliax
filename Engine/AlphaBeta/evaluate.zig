@@ -42,7 +42,7 @@ const w_double_threat = 400;
 // spanning (board_size - 1) rows or cols (one step from road)
 const w_soft_threat = 60;
 
-const w_rings = [_]i32{ 2, 8, -5 };
+const w_rings = [_]i32{ 2, 5, 0 };
 
 const cap_psqt = [_]i32{
     -20, -5, -5, -5, -5, -20,
