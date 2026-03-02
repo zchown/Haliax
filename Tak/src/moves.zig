@@ -589,7 +589,7 @@ pub fn generatePlaceMoves(board: *const brd.Board, moves: *MoveList) !void {
     }
 }
 
-fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
+pub fn generateSlideMoves(board: *const brd.Board, moves: *MoveList) !void {
     // const z = tracy.trace(@src());
     // defer z.end();
 

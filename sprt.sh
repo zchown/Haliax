@@ -2,7 +2,8 @@
 set -euo pipefail
 
 ENGINE_NEW="./zig-out/bin/Haliax"
-ENGINE_BASE="./engines/Haliax_AB_0.20"
+ENGINE_BASE="./engines/Haliax_AB_1.11"
+# ENGINE_BASE="./engines/Haliax_AB_0.22"
 # ENGINE_BASE="./engines/HaliaxFlatDiff"
 # ENGINE_BASE="./engines/HaliaxRandom"
 # ENGINE_BASE="./../syntaks/target/x86_64-apple-darwin/release/syntaks"
@@ -49,11 +50,11 @@ $RACETRACK \
   -e path="$ENGINE_BASE" \
   -e path="$ENGINE_NEW" \
   --all-engines tc=$TC \
+  --sprt elo0=$ELO0 elo1=$ELO1 alpha=$ALPHA beta=$BETA \
   --format sprt \
   --log $LOG \
   | tee "$LOG"
 
-# --sprt elo0=$ELO0 elo1=$ELO1 alpha=$ALPHA beta=$BETA \
 echo
 echo "SPRT test finished"
 echo "Log: $LOG"

@@ -33,7 +33,7 @@ pub const Engine = struct {
 
         engine.searcher.tt_table = &engine.tt_table;
 
-        srch.quiet_lmr = srch.initQuietLMR();
+        // srch.quiet_lmr = srch.initQuietLMR();
 
         return engine;
     }
